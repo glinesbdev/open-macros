@@ -12,7 +12,7 @@ import dev.glinesb.openmacros.data.db.AppDatabase
 import dev.glinesb.openmacros.data.remote.OpenFoodFactsApi
 import dev.glinesb.openmacros.data.remote.UsdaApi
 import dev.glinesb.openmacros.photo.FoodPhotoEstimator
-import dev.glinesb.openmacros.photo.UnavailableFoodPhotoEstimator
+import dev.glinesb.openmacros.photo.XaiFoodPhotoEstimator
 
 class OpenMacrosApp : Application() {
     val container by lazy { AppContainer(this) }
@@ -28,8 +28,8 @@ class AppContainer(context: Context) {
     val weights = WeightRepository(db)
     val backup = BackupManager(db, settings, context.contentResolver)
 
-    /** Next phase (photo logging). Not implemented in v1. */
-    val photoEstimator: FoodPhotoEstimator = UnavailableFoodPhotoEstimator
+    /** Optional photo logging with the user's own xAI key (available only once a key is saved). */
+    val photoEstimator: FoodPhotoEstimator = XaiFoodPhotoEstimator(keys)
 }
 
 val Context.container: AppContainer get() = (applicationContext as OpenMacrosApp).container

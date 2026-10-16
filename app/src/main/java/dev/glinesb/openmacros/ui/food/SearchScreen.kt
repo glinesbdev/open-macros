@@ -67,6 +67,8 @@ fun SearchScreen(
     onBack: () -> Unit,
     onOpenFood: (Long) -> Unit,
     onScan: () -> Unit,
+    onPhoto: () -> Unit,
+    onOpenSettings: () -> Unit,
     onQuickAdd: () -> Unit,
     onCreateFood: () -> Unit,
     onEditFood: (Long) -> Unit,
@@ -80,6 +82,8 @@ fun SearchScreen(
     val favorites by c.foods.favorites.collectAsStateWithLifecycle(emptyList())
     val custom by c.foods.customFoods.collectAsStateWithLifecycle(emptyList())
     val hasKey by c.keys.hasUsdaKey.collectAsStateWithLifecycle()
+    val hasXaiKey by c.keys.hasXaiKey.collectAsStateWithLifecycle()
+    var photoExplainer by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -88,6 +92,9 @@ fun SearchScreen(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
                     IconButton(onClick = onScan) { Icon(painterResource(R.drawable.ic_qr_code_scanner), "Scan barcode") }
+                    IconButton(onClick = { if (hasXaiKey) onPhoto() else photoExplainer = true }) {
+                        Icon(painterResource(R.drawable.ic_photo_camera), "Log from a photo")
+                    }
                     IconButton(onClick = onQuickAdd) { Icon(painterResource(R.drawable.ic_bolt), "Quick add") }
                     IconButton(onClick = onCreateFood) { Icon(painterResource(R.drawable.ic_post_add), "Create food") }
                 },
@@ -152,6 +159,24 @@ fun SearchScreen(
             }
         }
     }
+    if (photoExplainer) PhotoExplainer(onDismiss = { photoExplainer = false }, onOpenSettings = onOpenSettings)
+}
+
+@Composable
+private fun PhotoExplainer(onDismiss: () -> Unit, onOpenSettings: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Log from a photo") },
+        text = {
+            Text(
+                "Snap your plate and Grok estimates the foods, portions and macros for you to review. " +
+                    "This optional feature uses your own xAI API key: each photo is a paid request billed to your " +
+                    "xAI account, and photos are sent to xAI only when you use it. Add a key in Settings to turn it on.",
+            )
+        },
+        confirmButton = { TextButton(onClick = { onDismiss(); onOpenSettings() }) { Text("Open Settings") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Not now") } },
+    )
 }
 
 @Composable

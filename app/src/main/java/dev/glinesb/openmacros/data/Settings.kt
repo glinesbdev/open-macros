@@ -103,7 +103,7 @@ class SettingsStore(context: Context) {
 }
 
 /**
- * The user's own USDA FoodData Central (api.data.gov) key, encrypted at rest with
+ * The user's own API keys (USDA FoodData Central / api.data.gov, and xAI), encrypted at rest with
  * EncryptedSharedPreferences (AES-256-GCM values, key wrapped by an Android Keystore master key).
  * Never logged, never exported, and app backup is disabled.
  */
@@ -134,5 +134,19 @@ class SecureKeys(context: Context) {
             _hasUsdaKey.value = !v.isNullOrBlank() && prefs != null
         }
 
-    private companion object { const val K_USDA = "usda_api_key" }
+    private val _hasXaiKey = MutableStateFlow(xaiKey != null)
+    val hasXaiKey: StateFlow<Boolean> = _hasXaiKey.asStateFlow()
+
+    /** The user's own xAI API key for optional photo logging (billed to their xAI account). */
+    var xaiKey: String?
+        get() = prefs?.getString(K_XAI, null)?.takeIf { it.isNotBlank() }
+        set(v) {
+            prefs?.edit()?.apply { if (v.isNullOrBlank()) remove(K_XAI) else putString(K_XAI, v.trim()) }?.apply()
+            _hasXaiKey.value = !v.isNullOrBlank() && prefs != null
+        }
+
+    private companion object {
+        const val K_USDA = "usda_api_key"
+        const val K_XAI = "xai_api_key"
+    }
 }

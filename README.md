@@ -5,6 +5,7 @@
 A free, open-source **calorie, macro and weight tracker** for Android: a basic alternative to paid apps
 like MacroFactor. Kotlin + Jetpack Compose + Material 3, minSdk 29 (Android 10), targetSdk 36.
 No account, no ads, no subscription. Your data stays on your phone.
+(The optional photo-logging feature sends meal photos to xAI, only when you use it; see below.)
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
 
@@ -27,6 +28,10 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
   calorie target. Logging a new latest weigh-in updates the weight used for the target.
 - **Your data**: export a full JSON backup or a spreadsheet-friendly CSV, and import either one
   (Storage Access Framework, so you pick where files go). Nothing is uploaded anywhere.
+- **Photo logging (optional, your own xAI key)**: take a photo or pick one from the gallery, and Grok
+  estimates each food's grams, calories and macros. Review everything before it's logged: edit grams
+  (macros scale proportionally) or macros, see a confidence badge per item, swap any item for an Open Food
+  Facts / USDA match, pick the meal, then log. See [Photo logging](#photo-logging-optional-paid) below.
 - Follows the system light/dark theme with Material You dynamic color on Android 12+, edge-to-edge.
 
 ## Build and install
@@ -53,6 +58,28 @@ Open Food Facts needs no key. Every request sends a `User-Agent` identifying the
 (`OpenMacros/<version> (Android; https://github.com/glinesbdev/open-macros)`) as OFF asks. Search is only run
 when you submit, to stay well within OFF's rate limits.
 
+## Photo logging (optional, paid)
+
+Photo logging is **off unless you add your own xAI API key** in **Settings → Photo logging**
+(get one at <https://console.x.ai>). The key is stored like the USDA key: encrypted on the device with
+`EncryptedSharedPreferences` / Android Keystore, sent only in the `Authorization` header to `api.x.ai`,
+never logged, and never included in backups.
+
+- **It costs money.** Each photo is a paid request to the xAI API, **billed to your own xAI account** at
+  xAI's per-token rates for the model (currently `grok-4.7`, with low reasoning effort). Open Macros adds no
+  fee. When xAI reports it, the review screen shows what that estimate cost.
+- **Privacy.** Photos are sent to xAI **only when you use this feature**: the moment you take or pick a photo
+  on the photo-log screen. Nothing is sent otherwise. The photo is downscaled to about 1024 px and re-encoded
+  as JPEG first (which also strips EXIF metadata such as location), sent through the stateless chat completions
+  endpoint, and not saved by Open Macros. xAI's own data terms apply to what it receives.
+- **Accuracy.** AI estimates are approximate (portion size is the hardest part, often ±20–30 %). Treat them as
+  a starting point and correct them, or swap items for database foods, before logging.
+
+How it works: `XaiFoodPhotoEstimator` posts the image as a base64 `image_url` data URL to
+`https://api.x.ai/v1/chat/completions` with a strict JSON schema (`response_format: json_schema`); the reply
+(`items[]` with name, grams, kcal, protein, carbs, fat, confidence, plus `notes`) is validated and range-checked
+before the review screen shows it.
+
 ## Data sources and attribution
 
 - **Open Food Facts**: product data © Open Food Facts contributors, available under the
@@ -68,9 +95,6 @@ Calorie targets are estimates from a standard formula, not medical advice.
 
 ## Roadmap
 
-- **Photo logging** (next phase): snap a meal, get an editable estimate of foods, grams, calories and
-  macros from a vision model (e.g. Grok via the xAI API with your own key). The `FoodPhotoEstimator`
-  interface is in place (`photo/FoodPhotoEstimator.kt`); there's no implementation or UI yet.
 - Adaptive TDEE from your intake vs. weight trend, recipes, Health Connect sync.
 
 ## License

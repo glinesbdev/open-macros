@@ -34,6 +34,7 @@ import dev.glinesb.openmacros.ui.food.FoodDetailScreen
 import dev.glinesb.openmacros.ui.food.QuickAddScreen
 import dev.glinesb.openmacros.ui.food.SearchScreen
 import dev.glinesb.openmacros.ui.goals.ProfileScreen
+import dev.glinesb.openmacros.ui.photo.PhotoLogScreen
 import dev.glinesb.openmacros.ui.scan.ScanScreen
 import dev.glinesb.openmacros.ui.settings.SettingsScreen
 import dev.glinesb.openmacros.ui.today.TodayScreen
@@ -56,6 +57,7 @@ object Routes {
     fun add(day: Long, meal: Meal) = "add/$day/${meal.name}"
     fun scan(day: Long, meal: Meal) = "scan/$day/${meal.name}"
     fun quickAdd(day: Long, meal: Meal) = "quickadd/$day/${meal.name}"
+    fun photo(day: Long, meal: Meal) = "photo/$day/${meal.name}"
     fun food(id: Long, day: Long, meal: Meal, entryId: Long = -1) = "food/$id?day=$day&meal=${meal.name}&entryId=$entryId"
     fun custom(day: Long = -1, meal: Meal? = null, barcode: String? = null, foodId: Long = -1) =
         "custom?day=$day&meal=${meal?.name.orEmpty()}&barcode=${barcode.orEmpty()}&foodId=$foodId"
@@ -116,6 +118,8 @@ fun OpenMacrosRoot() {
                     onBack = { nav.popBackStack() },
                     onOpenFood = { id -> nav.navigate(Routes.food(id, day, meal)) },
                     onScan = { nav.navigate(Routes.scan(day, meal)) },
+                    onPhoto = { nav.navigate(Routes.photo(day, meal)) },
+                    onOpenSettings = { nav.switchTab(Routes.SETTINGS) },
                     onQuickAdd = { nav.navigate(Routes.quickAdd(day, meal)) },
                     onCreateFood = { nav.navigate(Routes.custom(day, meal)) },
                     onEditFood = { id -> nav.navigate(Routes.custom(foodId = id)) },
@@ -127,6 +131,14 @@ fun OpenMacrosRoot() {
                     onBack = { nav.popBackStack() },
                     onFound = { id -> nav.navigate(Routes.food(id, day, meal)) { popUpTo("scan/{day}/{meal}") { inclusive = true } } },
                     onCreate = { code -> nav.navigate(Routes.custom(day, meal, code)) { popUpTo("scan/{day}/{meal}") { inclusive = true } } },
+                )
+            }
+            composable("photo/{day}/{meal}", dayMeal) { e ->
+                PhotoLogScreen(
+                    day = e.arguments!!.getLong("day"),
+                    initialMeal = Meal.valueOf(e.arguments!!.getString("meal")!!),
+                    onBack = { nav.popBackStack() },
+                    onLogged = { nav.backToToday() },
                 )
             }
             composable("quickadd/{day}/{meal}", dayMeal) { e ->

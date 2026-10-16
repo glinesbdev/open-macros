@@ -18,12 +18,17 @@ data/
   Settings.kt     SettingsStore (SharedPreferences → StateFlow<AppSettings>), SecureKeys (encrypted USDA key)
   Repositories.kt FoodRepository (search/merge/cache/barcode), LogRepository, WeightRepository
 photo/
-  FoodPhotoEstimator.kt   Interface + UnavailableFoodPhotoEstimator (next phase; not implemented)
+  FoodPhotoEstimator.kt     Interface + result types
+  XaiFoodPhotoEstimator.kt  xAI chat completions client (user's key, error mapping)
+  PhotoEstimateParser.kt    Pure: request JSON (prompt + schema), response validation (tested)
+  PhotoReview.kt            Pure: editable ReviewItem, proportional scaling, database swap (tested)
+  ImagePrep.kt              ImageDecoder downscale to 1024 px + JPEG; ImageSizing (tested)
 ui/
   Root.kt         Navigation graph + bottom bar (Diary, Weight, Settings)
   today/          Daily diary, calorie ring, macro bars, date navigation
   food/           Search (Recent / Favorites / My foods tabs), food detail, quick add, custom food editor
   scan/           CameraX preview + ML Kit analyzer, manual barcode entry
+  photo/          Photo log: capture (CameraX ImageCapture / photo picker) → analyzing → review → log
   weight/         Trend chart, log form, history
   goals/          Onboarding / profile & goal form (live BMR/TDEE/target preview)
   settings/       Targets, macro split, units, USDA key, export/import, about/attribution
@@ -86,15 +91,34 @@ bottom `NavigationBar` (which pads for the system nav bar itself). The `NavHost`
 `consumeWindowInsets`, so each screen's own `Scaffold`/`TopAppBar` handles the status bar, and the nav bar
 inset only when the bottom bar is hidden. Forms use `imePadding()`.
 
-## Photo logging seam (next phase)
+## Photo logging (optional, user's xAI key)
 
-`FoodPhotoEstimator.estimate(FoodPhoto): PhotoEstimate` returns editable `EstimatedFood` items (name,
-grams, macros, confidence). `AppContainer.photoEstimator` is `UnavailableFoodPhotoEstimator` in v1. The
-plan: an xAI-backed implementation using the user's own key (stored like the USDA key), and a review screen
-that lets the user correct each item before it becomes ordinary log entries.
+1. Entry: camera button on the add-food screen. Without a saved xAI key it shows an explainer that links to
+   Settings instead of opening the camera.
+2. Capture: CameraX `ImageCapture` to a temp file in `cacheDir` (deleted right after decoding), or the system
+   photo picker (no storage permission). Optional free-text hint ("cooked in butter").
+3. `ImagePrep` decodes with `ImageDecoder` (applies EXIF rotation, drops metadata), scales so the long edge is
+   ≤ 1024 px, re-encodes JPEG q85. The bytes are held only in the ViewModel (so "Try again" can resend).
+4. `XaiFoodPhotoEstimator` POSTs to `https://api.x.ai/v1/chat/completions`, model `grok-4.7`
+   (text+image → text, structured outputs), `reasoning_effort: low`, `max_completion_tokens: 2000`, image as a
+   base64 `image_url` data URL with `detail: high`, and `response_format: json_schema` (strict). If the API
+   rejects `response_format`, it retries once without it; the system prompt also demands bare JSON. Chat
+   completions (stateless) is used rather than Responses so nothing is stored server-side for retrieval.
+5. `PhotoEstimateParser` never trusts the reply: it extracts the first balanced JSON object (fences/prose
+   tolerated), drops items without a name or with out-of-range numbers (> 3000 g, > 5000 kcal), clamps
+   confidence to 0..1 (reading > 1 as a percentage), recomputes missing kcal from macros, caps at 20 items, and
+   turns refusals, truncation (`finish_reason: length`) and empty results into `PhotoEstimateException`s.
+   HTTP errors map to friendly messages; xAI reports a bad key as 400 "Incorrect API key", handled like 401.
+   The key is never put in messages or logs.
+6. Review: each `ReviewItem` has editable grams (macros scale proportionally via `withGrams`) and macros
+   (`withMacros`), a confidence badge, include/remove, and "Find in food database" (`FoodRepository.search`
+   by name → `swappedFor` keeps the estimated grams and uses the database food's nutrition). Logging writes
+   ordinary `LogEntryEntity` rows: linked to the food (grams) when swapped, otherwise `foodId = null` with brand
+   "Photo estimate".
 
 ## Privacy
 
-No account, no analytics, no backend. Network calls go only to Open Food Facts and api.nal.usda.gov.
+No account, no analytics, no backend. Network calls go only to Open Food Facts and api.nal.usda.gov, plus
+api.x.ai when (and only when) the user runs a photo estimate with their own key.
 `allowBackup="false"` plus data-extraction rules exclude everything from cloud backup and device transfer;
-use in-app export instead. Backups never contain the API key.
+use in-app export instead. Backups never contain API keys.

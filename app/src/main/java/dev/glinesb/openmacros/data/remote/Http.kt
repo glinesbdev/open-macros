@@ -47,6 +47,15 @@ object Http {
     }
 }
 
+/** Like [Http.client] but with timeouts long enough for a vision model to think. */
+internal val longClient: OkHttpClient by lazy {
+    Http.client.newBuilder()
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .callTimeout(150, TimeUnit.SECONDS)
+        .build()
+}
+
 /** Lenient numeric read: sources mix numbers and numeric strings. */
 internal fun JsonObject.num(key: String): Double? {
     val p = this[key] as? JsonPrimitive ?: return null

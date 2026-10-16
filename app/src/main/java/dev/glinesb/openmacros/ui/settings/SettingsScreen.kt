@@ -31,6 +31,8 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
     val uri = LocalUriHandler.current
     val settings by c.settings.state.collectAsStateWithLifecycle()
     val hasKey by c.keys.hasUsdaKey.collectAsStateWithLifecycle()
+    val hasXaiKey by c.keys.hasXaiKey.collectAsStateWithLifecycle()
+    var xaiInput by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
 
     var pPct by rememberSaveable(settings.macroSplit) { mutableStateOf(settings.macroSplit.proteinPct.toString()) }
@@ -151,8 +153,8 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
             }
             item {
                 Section("Your data") {
-                    Text("Everything is stored only on this phone. There is no account and nothing is uploaded. " +
-                        "Export a backup to move phones or keep a copy. Backups never include your API key.",
+                    Text("Your diary, foods and weigh-ins are stored only on this phone. There is no account and they are never uploaded. " +
+                        "Export a backup to move phones or keep a copy. Backups never include your API keys.",
                         style = MaterialTheme.typography.bodySmall)
                     val stamp = LocalDate.now().toString()
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -165,9 +167,29 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
                 }
             }
             item {
-                Section("Photo logging") {
-                    Text("Coming next: snap a meal and get an editable calorie estimate using your own xAI key. Not available yet.",
-                        style = MaterialTheme.typography.bodySmall)
+                Section("Photo logging (optional, xAI)") {
+                    Text(
+                        "Take or pick a photo of your meal and Grok estimates the foods, grams and macros for you to review " +
+                            "before logging. This uses your own xAI API key: every photo is a paid request billed to your xAI " +
+                            "account (the review screen shows what each one cost). Photos are sent to xAI only when you use " +
+                            "this feature, and Open Macros doesn't keep them.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(if (hasXaiKey) "Your xAI key is saved (encrypted on this device). Photo logging is on."
+                        else "No xAI key saved. Photo logging is off.", style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = xaiInput, onValueChange = { xaiInput = it.trim() },
+                        label = { Text(if (hasXaiKey) "Replace xAI key" else "xAI API key") },
+                        singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row {
+                        Button(enabled = xaiInput.isNotBlank() && c.keys.isAvailable,
+                            onClick = { c.keys.xaiKey = xaiInput; xaiInput = "" }) { Text("Save key") }
+                        Spacer(Modifier.width(8.dp))
+                        if (hasXaiKey) TextButton(onClick = { c.keys.xaiKey = null }) { Text("Remove") }
+                        TextButton(onClick = { uri.openUri("https://console.x.ai") }) { Text("Get a key") }
+                    }
                 }
             }
             item {
