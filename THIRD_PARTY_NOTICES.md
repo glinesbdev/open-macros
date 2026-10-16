@@ -20,7 +20,7 @@ The components and data below are **not** covered by that license. Each keeps it
 
 | Component | License | Notes |
 |---|---|---|
-| AndroidX (Core, Activity, Lifecycle, Navigation, Room, CameraX, security-crypto) and Jetpack Compose / Material 3 | Apache-2.0 | © The Android Open Source Project |
+| AndroidX (Core, Activity, Lifecycle, Navigation, Room, CameraX, Browser/Custom Tabs, security-crypto) and Jetpack Compose / Material 3 | Apache-2.0 | © The Android Open Source Project |
 | ML Kit Barcode Scanning (`com.google.mlkit:barcode-scanning`, bundled model) | [ML Kit Terms of Service](https://developers.google.com/ml-kit/terms) | © Google LLC. Proprietary SDK, free to use; runs fully on-device. |
 | Kotlin, kotlinx.coroutines, kotlinx.serialization | Apache-2.0 | © JetBrains |
 | OkHttp, Okio | Apache-2.0 | © Square, Inc. |

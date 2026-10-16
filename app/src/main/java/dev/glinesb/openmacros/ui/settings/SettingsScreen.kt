@@ -10,7 +10,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,16 +18,19 @@ import dev.glinesb.openmacros.container
 import dev.glinesb.openmacros.domain.HeightUnit
 import dev.glinesb.openmacros.domain.MacroSplit
 import dev.glinesb.openmacros.domain.WeightUnit
+import dev.glinesb.openmacros.ui.components.ApiKeyHelp
+import dev.glinesb.openmacros.ui.components.KeyLinks
 import dev.glinesb.openmacros.ui.components.NumberField
+import dev.glinesb.openmacros.ui.components.openLink
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onEditProfile: () -> Unit) {
-    val c = LocalContext.current.container
+    val context = LocalContext.current
+    val c = context.container
     val scope = rememberCoroutineScope()
-    val uri = LocalUriHandler.current
     val settings by c.settings.state.collectAsStateWithLifecycle()
     val hasKey by c.keys.hasUsdaKey.collectAsStateWithLifecycle()
     val hasXaiKey by c.keys.hasXaiKey.collectAsStateWithLifecycle()
@@ -147,8 +149,19 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
                             onClick = { c.keys.usdaKey = keyInput; keyInput = "" }) { Text("Save key") }
                         Spacer(Modifier.width(8.dp))
                         if (hasKey) TextButton(onClick = { c.keys.usdaKey = null }) { Text("Remove") }
-                        TextButton(onClick = { uri.openUri("https://fdc.nal.usda.gov/api-key-signup") }) { Text("Get a free key") }
                     }
+                    OutlinedButton(onClick = { openLink(context, KeyLinks.USDA_SIGNUP) }) { Text("Get a free key") }
+                    ApiKeyHelp(
+                        steps = listOf(
+                            "Tap \"Get a free key\" and fill in your name and email on the api.data.gov sign-up form.",
+                            "Check your email: the key arrives within a minute or so (no account or password needed).",
+                            "Copy the key from the email.",
+                            "Paste it in the field above and tap Save key.",
+                        ),
+                        costNote = "Free. A personal key allows about 1,000 searches an hour; without one the shared DEMO_KEY allows about 30.",
+                        docsLabel = "FoodData Central API docs",
+                        docsUrl = KeyLinks.USDA_DOCS,
+                    )
                 }
             }
             item {
@@ -188,8 +201,15 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
                             onClick = { c.keys.xaiKey = xaiInput; xaiInput = "" }) { Text("Save key") }
                         Spacer(Modifier.width(8.dp))
                         if (hasXaiKey) TextButton(onClick = { c.keys.xaiKey = null }) { Text("Remove") }
-                        TextButton(onClick = { uri.openUri("https://console.x.ai") }) { Text("Get a key") }
                     }
+                    OutlinedButton(onClick = { openLink(context, KeyLinks.XAI_API_KEYS) }) { Text("Get a key") }
+                    ApiKeyHelp(
+                        steps = xaiKeySteps,
+                        costNote = "Paid: each photo estimate is billed per request (per token) to your own xAI account, " +
+                            "so you need credits loaded. Open Macros adds no fee.",
+                        docsLabel = "xAI API docs (docs.x.ai)",
+                        docsUrl = KeyLinks.XAI_DOCS,
+                    )
                 }
             }
             item {
@@ -200,9 +220,9 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
                         "USDA FoodData Central, U.S. Department of Agriculture, public domain.",
                         style = MaterialTheme.typography.bodySmall)
                     Row {
-                        TextButton(onClick = { uri.openUri("https://world.openfoodfacts.org") }) { Text("Open Food Facts") }
-                        TextButton(onClick = { uri.openUri("https://opendatacommons.org/licenses/odbl/1-0/") }) { Text("ODbL") }
-                        TextButton(onClick = { uri.openUri("https://github.com/glinesbdev/open-macros") }) { Text("Source") }
+                        TextButton(onClick = { openLink(context, "https://world.openfoodfacts.org") }) { Text("Open Food Facts") }
+                        TextButton(onClick = { openLink(context, "https://opendatacommons.org/licenses/odbl/1-0/") }) { Text("ODbL") }
+                        TextButton(onClick = { openLink(context, "https://github.com/glinesbdev/open-macros") }) { Text("Source") }
                     }
                     Text("Calorie targets are estimates, not medical advice.", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -227,6 +247,13 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
         )
     }
 }
+
+private val xaiKeySteps = listOf(
+    "Sign up or log in at console.x.ai and verify your email.",
+    "Add credits under Billing (the API is pay-as-you-go).",
+    "Open API Keys (\"Get a key\" goes straight there) and create a new key.",
+    "Copy the key (it's shown only once), paste it in the field above and tap Save key.",
+)
 
 @Composable
 private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {

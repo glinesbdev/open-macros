@@ -49,8 +49,16 @@ to enable it on GitHub Actions; it runs `assembleDebug` + unit tests and uploads
 
 USDA search needs an api.data.gov key. Without one the app uses the shared `DEMO_KEY`, which is limited to
 about **30 requests an hour and 50 a day** per IP address, so you'll see "rate limit" messages quickly.
-Get a free personal key (1,000 requests/hour) at <https://fdc.nal.usda.gov/api-key-signup> and paste it in
-**Settings → USDA FoodData Central key**. It's stored only on the device, encrypted with
+A free personal key allows about 1,000 requests an hour. **How to get one** (also under "How do I get this?" in
+Settings):
+
+1. Open the sign-up form at <https://fdc.nal.usda.gov/api-key-signup> (Settings → **Get a free key**) and enter
+   your name and email.
+2. Check your email: the api.data.gov key arrives within a minute or so. No account or password is needed.
+3. Copy the key from the email.
+4. Paste it in **Settings → USDA FoodData Central key** and tap **Save key**.
+
+Cost: free. API docs: <https://fdc.nal.usda.gov/api-guide>. It's stored only on the device, encrypted with
 `EncryptedSharedPreferences` under an Android Keystore master key, never logged, never exported in backups,
 and Android backup is disabled for the app.
 
@@ -60,8 +68,17 @@ when you submit, to stay well within OFF's rate limits.
 
 ## Photo logging (optional, paid)
 
-Photo logging is **off unless you add your own xAI API key** in **Settings → Photo logging**
-(get one at <https://console.x.ai>). The key is stored like the USDA key: encrypted on the device with
+Photo logging is **off unless you add your own xAI API key** in **Settings → Photo logging**.
+**How to get one** (also under "How do I get this?" in Settings):
+
+1. Sign up or log in at <https://console.x.ai> and verify your email.
+2. Add credits under Billing (the API is pay-as-you-go).
+3. Open the API Keys page, <https://console.x.ai/team/default/api-keys> (Settings → **Get a key** goes straight
+   there), and create a new key.
+4. Copy the key (it's shown only once), paste it in **Settings → Photo logging** and tap **Save key**.
+
+Cost: paid per request, billed to your own xAI account (details below). API docs: <https://docs.x.ai/developers/quickstart>.
+Settings links open in a Custom Tab (or your browser). The key is stored like the USDA key: encrypted on the device with
 `EncryptedSharedPreferences` / Android Keystore, sent only in the `Authorization` header to `api.x.ai`,
 never logged, and never included in backups.
 
