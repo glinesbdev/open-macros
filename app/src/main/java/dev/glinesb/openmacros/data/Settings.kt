@@ -28,6 +28,10 @@ data class AppSettings(
     val calorieOverride: Int? = null,
     val weightUnit: WeightUnit = WeightUnit.LB,
     val heightUnit: HeightUnit = HeightUnit.FT_IN,
+    /** Default unit for logging lifts; separate from the body-weight unit and changeable per exercise. */
+    val trainingUnit: WeightUnit = WeightUnit.LB,
+    /** The routine "Start next workout" follows, if any. */
+    val activeRoutineId: Long? = null,
 ) {
     val computedCalories: Int? get() = profile?.let(Tdee::calorieTarget)
     val calorieTarget: Int get() = calorieOverride ?: computedCalories ?: 2000
@@ -67,6 +71,8 @@ class SettingsStore(context: Context) {
             calorieOverride = prefs.getInt(K_OVERRIDE, -1).takeIf { it > 0 },
             weightUnit = runCatching { WeightUnit.valueOf(prefs.getString(K_WUNIT, null)!!) }.getOrDefault(WeightUnit.LB),
             heightUnit = runCatching { HeightUnit.valueOf(prefs.getString(K_HUNIT, null)!!) }.getOrDefault(HeightUnit.FT_IN),
+            trainingUnit = runCatching { WeightUnit.valueOf(prefs.getString(K_TUNIT, null)!!) }.getOrDefault(WeightUnit.LB),
+            activeRoutineId = prefs.getLong(K_ACTIVE_ROUTINE, -1L).takeIf { it > 0 },
         )
     }
 
@@ -90,6 +96,8 @@ class SettingsStore(context: Context) {
             putInt(K_OVERRIDE, s.calorieOverride ?: -1)
             putString(K_WUNIT, s.weightUnit.name)
             putString(K_HUNIT, s.heightUnit.name)
+            putString(K_TUNIT, s.trainingUnit.name)
+            putLong(K_ACTIVE_ROUTINE, s.activeRoutineId ?: -1L)
         }.apply()
     }
 
@@ -99,6 +107,7 @@ class SettingsStore(context: Context) {
         const val K_RATE = "rate_kg_week"; const val K_P = "protein_pct"; const val K_C = "carbs_pct"
         const val K_F = "fat_pct"; const val K_OVERRIDE = "calorie_override"
         const val K_WUNIT = "weight_unit"; const val K_HUNIT = "height_unit"
+        const val K_TUNIT = "training_unit"; const val K_ACTIVE_ROUTINE = "active_routine_id"
     }
 }
 

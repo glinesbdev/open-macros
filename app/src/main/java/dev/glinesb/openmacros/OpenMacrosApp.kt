@@ -6,6 +6,7 @@ import dev.glinesb.openmacros.data.FoodRepository
 import dev.glinesb.openmacros.data.LogRepository
 import dev.glinesb.openmacros.data.SecureKeys
 import dev.glinesb.openmacros.data.SettingsStore
+import dev.glinesb.openmacros.data.TrainingRepository
 import dev.glinesb.openmacros.data.WeightRepository
 import dev.glinesb.openmacros.data.backup.BackupManager
 import dev.glinesb.openmacros.data.db.AppDatabase
@@ -26,7 +27,8 @@ class AppContainer(context: Context) {
     val foods = FoodRepository(db, OpenFoodFactsApi(), UsdaApi(), keys)
     val log = LogRepository(db)
     val weights = WeightRepository(db)
-    val backup = BackupManager(db, settings, context.contentResolver)
+    val training = TrainingRepository(db, settings)
+    val backup = BackupManager(db, settings, context.contentResolver, training)
 
     /** Optional photo logging with the user's own xAI key (available only once a key is saved). */
     val photoEstimator: FoodPhotoEstimator = XaiFoodPhotoEstimator(keys)

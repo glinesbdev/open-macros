@@ -2,8 +2,8 @@
 
 <p align="center"><img src="docs/icon-512.png" width="160" alt="Open Macros icon"></p>
 
-A free, open-source **calorie, macro and weight tracker** for Android: a basic alternative to paid apps
-like MacroFactor. Kotlin + Jetpack Compose + Material 3, minSdk 29 (Android 10), targetSdk 36.
+A free, open-source **calorie, macro, weight and workout tracker** for Android: a basic alternative to paid
+apps like MacroFactor. Kotlin + Jetpack Compose + Material 3, minSdk 29 (Android 10), targetSdk 36.
 No account, no ads, no subscription. Your data stays on your phone.
 (The optional photo-logging feature sends meal photos to xAI, only when you use it; see below.)
 
@@ -32,6 +32,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
   estimates each food's grams, calories and macros. Review everything before it's logged: edit grams
   (macros scale proportionally) or macros, see a confidence badge per item, swap any item for an Open Food
   Facts / USDA match, pick the meal, then log. See [Photo logging](#photo-logging-optional-paid) below.
+- **Training**: an exercise library (113 built-in, plus your own), routines with days and per-exercise
+  targets, a split recommender for 2–6 days a week, workout logging with a rest timer, per-exercise
+  progress charts and PRs, and double-progression suggestions. See [Training](#training) below.
 - Follows the system light/dark theme with Material You dynamic color on Android 12+, edge-to-edge.
 
 ## Build and install
@@ -97,6 +100,74 @@ How it works: `XaiFoodPhotoEstimator` posts the image as a base64 `image_url` da
 (`items[]` with name, grams, kcal, protein, carbs, fat, confidence, plus `notes`) is validated and range-checked
 before the review screen shows it.
 
+## Training
+
+The **Training** tab (bottom bar, next to Weight) has three parts: **Workout** (start or resume, your routines),
+**History** (finished workouts) and **Exercises** (the library and per-exercise progress).
+
+**Exercise library.** 113 common exercises bundled with the app: barbell, dumbbell, cable, machine and bodyweight
+lifts plus cardio, each with primary and secondary muscles, equipment and type (compound, isolation or cardio).
+The list was written for Open Macros, not copied from a dataset. Add your own with **Custom exercise**; custom
+ones can be edited or deleted (deleting removes it from routines; logged sets keep the name).
+
+**Routines.** A routine is a list of days (e.g. "Upper A"), each an ordered list of exercises with target sets,
+a rep range, rest time and notes. Create, edit, reorder (days, exercises and routines), duplicate and delete them,
+and star one as **active**. "Start next" follows the active routine's days in order, picking the day after the
+one you trained last, so a 4-day routine fits any 4 days of your week.
+
+**Split recommender** (Workout → Recommend). Pick days per week (2–6, default 4), goal, experience and equipment
+(full gym, dumbbells only, or bodyweight). You get two or three templates, the best fit first, each with a short
+"why" and an estimate of weekly hard sets per muscle group:
+
+| Days | Options (first = recommended) |
+|---|---|
+| 2 | Full Body A/B · Upper/Lower |
+| 3 | Full Body A/B/C · Upper/Lower/Full · Push/Pull/Legs |
+| 4 | Upper/Lower ×2 · Push/Pull/Legs + Full Body · Full Body ×4 |
+| 5 | Upper/Lower + Push/Pull/Legs · Push/Pull/Legs + Upper/Lower |
+| 6 | Push/Pull/Legs ×2 · Upper/Lower ×3 (recommended first for beginners) |
+
+The goal sets reps, sets and rest (main lift / secondary / isolation):
+
+| Goal | Main lifts | Secondary | Isolation | Notes |
+|---|---|---|---|---|
+| Muscle gain (bulk) | 3 × 6–10, 150 s | 3 × 8–12 | 3 × 10–15 | ~10–20 hard sets per muscle a week |
+| Fat loss (cut) | 3 × 5–8, 150 s | 3 × 8–12 | 2 × 10–15 | stay heavy, slightly less volume |
+| Maintain / recomp | 3 × 6–10, 120 s | 3 × 8–12 | 2 × 10–15 | moderate |
+| Strength | 4 × 3–5, 180 s | 3 × 6–8 | 3 × 8–12 | conventional deadlift as a main lift |
+
+Beginners get at most 3 sets and fewer exercises; advanced lifters get an extra set on main and secondary lifts.
+Bodyweight plans use higher rep ranges. **Create this routine** saves an ordinary routine you can edit.
+When you pick a goal and have a nutrition profile, the screen **offers** (never forces) a matching nutrition goal:
+cut → lose about 0.75 % of body weight a week; bulk → gain 0.25–0.5 % a week depending on experience; recomp →
+maintain; strength → no change.
+
+**Logging a workout.** Start the next routine day, any other day, or an empty workout. Each exercise is pre-filled
+from last time (warm-ups and working sets, reps and weight; nothing is ticked). For every set enter weight and
+reps, tap the set number to switch between **warm-up (W)** and **working**, and tick it when done, which starts the
+**rest timer** (−15 s / +15 s / skip; the phone buzzes when rest is over, while the app is open). Weights are entered
+in your **training unit** (Settings → Units, separate from the body-weight unit), and each exercise has an
+lb ⇄ kg switch. Weights are stored in kg, with each set's entered unit kept for display, so switching units never
+changes the stored value. Add workout notes, then **Finish**: ticked sets are saved; unticked or empty ones are dropped.
+Cardio is logged as minutes. The screen stays on during a workout.
+
+**Progress.** Each exercise has a chart of estimated 1RM per session (Epley: weight × (1 + reps / 30); best reps for
+unloaded bodyweight moves, minutes for cardio), PRs (best e1RM, heaviest set, most reps, best session volume, all from
+working sets only) and its full history. **Double progression** suggestions show on each exercise during a workout:
+if every working set last time reached the top of the rep range, add **5 lb / 2.5 kg** (compounds) or **2.5 lb / 1 kg**
+(isolations) and restart at the bottom; otherwise keep the weight and add reps; if every set fell short of the bottom
+of the range two sessions running, drop about 10 %. **Apply** fills the suggestion into the unticked sets.
+
+**Backups.** The JSON backup includes the exercise library, routines and workouts (older backups without training
+data import fine and leave training data alone). Settings → Your data → **Export training sets (CSV)** writes one row
+per set: `date, workout, exercise, set, set_type, reps, weight, unit, weight_kg, e1rm_kg`.
+
+References behind the recommender: Schoenfeld, Ogborn & Krieger 2016 (training frequency, *Sports Med*
+46:1689); Schoenfeld, Ogborn & Krieger 2017 (weekly volume dose-response, *J Sports Sci* 35:1073); Schoenfeld et al.
+2017 (low vs high loads, *J Strength Cond Res* 31:3508); Schoenfeld et al. 2016 (longer rest periods, *J Strength
+Cond Res* 30:1805); Helms, Aragon & Fitschen 2014 (contest prep, 0.5–1 % a week loss, *JISSN* 11:20); Iraki et al.
+2019 (off-season gain rate, *Sports* 7:154). These are general guidelines, not personal coaching or medical advice.
+
 ## Data sources and attribution
 
 - **Open Food Facts**: product data © Open Food Facts contributors, available under the
@@ -113,6 +184,7 @@ Calorie targets are estimates from a standard formula, not medical advice.
 ## Roadmap
 
 - Adaptive TDEE from your intake vs. weight trend, recipes, Health Connect sync.
+- Training: a rest-timer notification when the app is in the background, supersets, a plate calculator.
 
 ## License
 

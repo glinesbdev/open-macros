@@ -38,6 +38,12 @@ import dev.glinesb.openmacros.ui.photo.PhotoLogScreen
 import dev.glinesb.openmacros.ui.scan.ScanScreen
 import dev.glinesb.openmacros.ui.settings.SettingsScreen
 import dev.glinesb.openmacros.ui.today.TodayScreen
+import dev.glinesb.openmacros.ui.training.ExerciseDetailScreen
+import dev.glinesb.openmacros.ui.training.RecommenderScreen
+import dev.glinesb.openmacros.ui.training.RoutineEditorScreen
+import dev.glinesb.openmacros.ui.training.TrainingScreen
+import dev.glinesb.openmacros.ui.training.WorkoutDetailScreen
+import dev.glinesb.openmacros.ui.training.WorkoutScreen
 import dev.glinesb.openmacros.ui.weight.WeightScreen
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector? = null, val iconRes: Int = 0)
@@ -45,6 +51,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val tabs = listOf(
     Tab(Routes.TODAY, "Diary", iconRes = R.drawable.ic_today),
     Tab(Routes.WEIGHT, "Weight", iconRes = R.drawable.ic_monitor_weight),
+    Tab(Routes.TRAINING, "Training", iconRes = R.drawable.ic_fitness_center),
     Tab(Routes.SETTINGS, "Settings", Icons.Outlined.Settings),
 )
 
@@ -54,6 +61,12 @@ object Routes {
     const val TODAY = "today"
     const val WEIGHT = "weight"
     const val SETTINGS = "settings"
+    const val TRAINING = "training"
+    const val RECOMMEND = "training/recommend"
+    fun routine(id: Long? = null) = "training/routine?id=${id ?: -1}"
+    fun workout(id: Long) = "training/workout/$id"
+    fun workoutDetail(id: Long) = "training/history/$id"
+    fun exercise(id: Long) = "training/exercise/$id"
     fun add(day: Long, meal: Meal) = "add/$day/${meal.name}"
     fun scan(day: Long, meal: Meal) = "scan/$day/${meal.name}"
     fun quickAdd(day: Long, meal: Meal) = "quickadd/$day/${meal.name}"
@@ -105,6 +118,50 @@ fun OpenMacrosRoot() {
                 )
             }
             composable(Routes.WEIGHT) { WeightScreen() }
+            composable(Routes.TRAINING) {
+                TrainingScreen(
+                    onOpenWorkout = { nav.navigate(Routes.workout(it)) },
+                    onOpenWorkoutDetail = { nav.navigate(Routes.workoutDetail(it)) },
+                    onEditRoutine = { nav.navigate(Routes.routine(it)) },
+                    onRecommend = { nav.navigate(Routes.RECOMMEND) },
+                    onOpenExercise = { nav.navigate(Routes.exercise(it)) },
+                )
+            }
+            composable(Routes.RECOMMEND) {
+                RecommenderScreen(
+                    onBack = { nav.popBackStack() },
+                    onCreated = { id -> nav.navigate(Routes.routine(id)) { popUpTo(Routes.RECOMMEND) { inclusive = true } } },
+                )
+            }
+            composable("training/routine?id={id}", listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })) { e ->
+                RoutineEditorScreen(
+                    routineId = e.arguments!!.getLong("id").takeIf { it > 0 },
+                    onBack = { nav.popBackStack() },
+                    onSaved = { nav.popBackStack() },
+                )
+            }
+            composable("training/workout/{id}", listOf(navArgument("id") { type = NavType.LongType })) { e ->
+                WorkoutScreen(
+                    workoutId = e.arguments!!.getLong("id"),
+                    onBack = { nav.popBackStack() },
+                    onFinished = { id -> nav.navigate(Routes.workoutDetail(id)) { popUpTo("training/workout/{id}") { inclusive = true } } },
+                    onOpenExercise = { nav.navigate(Routes.exercise(it)) },
+                )
+            }
+            composable("training/history/{id}", listOf(navArgument("id") { type = NavType.LongType })) { e ->
+                WorkoutDetailScreen(
+                    workoutId = e.arguments!!.getLong("id"),
+                    onBack = { nav.popBackStack() },
+                    onOpenExercise = { nav.navigate(Routes.exercise(it)) },
+                )
+            }
+            composable("training/exercise/{id}", listOf(navArgument("id") { type = NavType.LongType })) { e ->
+                ExerciseDetailScreen(
+                    exerciseId = e.arguments!!.getLong("id"),
+                    onBack = { nav.popBackStack() },
+                    onOpenWorkout = { nav.navigate(Routes.workoutDetail(it)) },
+                )
+            }
             composable(Routes.SETTINGS) { SettingsScreen(onEditProfile = { nav.navigate(Routes.GOALS) }) }
 
             val dayMeal = listOf(

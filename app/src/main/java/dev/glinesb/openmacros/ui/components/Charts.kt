@@ -81,7 +81,13 @@ fun MacroBar(label: String, value: Double, target: Int, color: Color, modifier: 
  * [points] and [trend] are in display units.
  */
 @Composable
-fun WeightChart(points: List<DatedValue>, trend: List<DatedValue>, modifier: Modifier = Modifier) {
+fun WeightChart(
+    points: List<DatedValue>,
+    trend: List<DatedValue>,
+    modifier: Modifier = Modifier,
+    emptyText: String = "Log a weigh-in to see your trend",
+    description: String = "Weight trend chart",
+) {
     val dot = MaterialTheme.colorScheme.outline
     val line = MaterialTheme.colorScheme.primary
     val grid = MaterialTheme.colorScheme.outlineVariant
@@ -89,11 +95,11 @@ fun WeightChart(points: List<DatedValue>, trend: List<DatedValue>, modifier: Mod
     val measurer = rememberTextMeasurer()
     if (points.isEmpty()) {
         Box(modifier, contentAlignment = Alignment.Center) {
-            Text("Log a weigh-in to see your trend", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
+            Text(emptyText, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
         }
         return
     }
-    Canvas(modifier.semantics { contentDescription = "Weight trend chart" }) {
+    Canvas(modifier.semantics { contentDescription = description }) {
         val all = points + trend
         var minV = all.minOf { it.value }
         var maxV = all.maxOf { it.value }

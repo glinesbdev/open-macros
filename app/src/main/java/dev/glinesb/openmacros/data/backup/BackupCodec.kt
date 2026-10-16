@@ -4,6 +4,17 @@ import dev.glinesb.openmacros.data.AppSettings
 import dev.glinesb.openmacros.data.db.FoodEntity
 import dev.glinesb.openmacros.data.db.LogEntryEntity
 import dev.glinesb.openmacros.data.db.WeightEntity
+import dev.glinesb.openmacros.data.db.ExerciseEntity
+import dev.glinesb.openmacros.data.db.RoutineDayEntity
+import dev.glinesb.openmacros.data.db.RoutineEntity
+import dev.glinesb.openmacros.data.db.RoutineExerciseEntity
+import dev.glinesb.openmacros.data.db.SetRow
+import dev.glinesb.openmacros.data.db.WorkoutEntity
+import dev.glinesb.openmacros.data.db.WorkoutExerciseEntity
+import dev.glinesb.openmacros.data.db.WorkoutSetEntity
+import dev.glinesb.openmacros.domain.Units
+import dev.glinesb.openmacros.domain.WeightUnit
+import dev.glinesb.openmacros.domain.training.Strength
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
@@ -12,15 +23,28 @@ import java.time.LocalDate
 @Serializable
 data class Backup(
     val format: String = FORMAT,
-    val version: Int = 1,
+    val version: Int = 2,
     val exportedAt: Long,
     val settings: AppSettings? = null,
     val foods: List<FoodEntity> = emptyList(),
     val entries: List<LogEntryEntity> = emptyList(),
     val weights: List<WeightEntity> = emptyList(),
+    /** Training data (version 2+). Null in older backups, in which case import leaves training data alone. */
+    val training: TrainingBackup? = null,
 ) {
     companion object { const val FORMAT = "open-macros-backup" }
 }
+
+@Serializable
+data class TrainingBackup(
+    val exercises: List<ExerciseEntity> = emptyList(),
+    val routines: List<RoutineEntity> = emptyList(),
+    val routineDays: List<RoutineDayEntity> = emptyList(),
+    val routineExercises: List<RoutineExerciseEntity> = emptyList(),
+    val workouts: List<WorkoutEntity> = emptyList(),
+    val workoutExercises: List<WorkoutExerciseEntity> = emptyList(),
+    val workoutSets: List<WorkoutSetEntity> = emptyList(),
+)
 
 /** Pure (JVM-testable) JSON and CSV encoding. */
 object BackupCodec {
@@ -83,6 +107,36 @@ object BackupCodec {
             }
         }
         return entries to weights.distinctBy { it.epochDay }
+    }
+
+    val SETS_CSV_HEADER = listOf(
+        "date", "workout", "exercise", "set", "set_type", "reps", "weight", "unit", "weight_kg", "e1rm_kg",
+    )
+
+    /**
+     * Training sets from finished workouts, one row per set. [weight] is in the unit it was entered in
+     * and [weight_kg] is the canonical value. For cardio, reps are minutes and the weight is blank.
+     */
+    fun setsToCsv(rows: List<SetRow>): String = buildString {
+        appendLine(SETS_CSV_HEADER.joinToString(","))
+        for (r in rows) {
+            val unit = runCatching { WeightUnit.valueOf(r.unit) }.getOrDefault(WeightUnit.KG)
+            val cardio = r.exerciseType == "CARDIO"
+            val kg = r.weightKg.takeUnless { cardio }
+            val e1 = if (kg != null && r.reps != null && r.setType == "WORKING") Strength.e1rm(kg, r.reps).takeIf { it > 0 } else null
+            appendLine(
+                listOf(
+                    LocalDate.ofEpochDay(r.epochDay).toString(), r.workoutName, r.exerciseName, (r.setPosition + 1).toString(),
+                    r.setType.lowercase(), r.reps?.toString().orEmpty(),
+                    kg?.let { num(roundTo(Units.toDisplayWeight(it, unit), 2)) }.orEmpty(), if (kg != null) unit.symbol else "",
+                    kg?.let { num(it) }.orEmpty(), e1?.let { num(roundTo(it, 2)) }.orEmpty(),
+                ).joinToString(",") { escape(it) },
+            )
+        }
+    }
+
+    private fun roundTo(d: Double, decimals: Int): Double {
+        val f = Math.pow(10.0, decimals.toDouble()); return Math.round(d * f) / f
     }
 
     private fun num(d: Double): String = if (d % 1.0 == 0.0) d.toLong().toString() else "%.3f".format(java.util.Locale.ROOT, d).trimEnd('0').trimEnd('.')

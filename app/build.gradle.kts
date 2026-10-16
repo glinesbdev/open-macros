@@ -13,8 +13,8 @@ android {
         applicationId = "dev.glinesb.openmacros"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         // Phones (arm) + x86_64 emulators. Drops 32-bit x86 to keep the ML Kit native lib smaller.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
@@ -68,4 +68,6 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     testImplementation("junit:junit:4.13.2")
+    // Real SQLite on the JVM for the Room migration test (runs the migration SQL, checks it against app/schemas).
+    testImplementation("org.xerial:sqlite-jdbc:3.46.1.3")
 }

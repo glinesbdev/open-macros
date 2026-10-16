@@ -11,12 +11,21 @@ domain/         Pure Kotlin, no Android: unit-tested
   Nutrition.kt    Macros, Meal, FoodSource, FoodItem (normalised to one serving), AmountUnit, Portions
   FoodMerge.kt    Cross-source de-duplication (barcode / name+brand) and relevance ranking
   Units.kt        lb/kg, cm/ft-in, g/oz
+  training/
+    TrainingModel.kt     Muscle, Equipment, ExerciseType, SetType, TrainingGoal, Experience, EquipmentAccess
+    ExerciseLibrary.kt   The 113 built-in exercises (stable slugs)
+    Strength.kt          Epley e1RM, per-session series, PRs; Progression (double progression rules)
+    SplitRecommender.kt  Templates by days/week, slot → exercise by equipment, goal/experience prescriptions,
+                         nutrition-goal suggestion
 data/
-  db/             Room: FoodEntity, LogEntryEntity, WeightEntity, DAOs, AppDatabase (schema in app/schemas)
+  db/             Room: FoodEntity, LogEntryEntity, WeightEntity, training entities (TrainingEntities.kt),
+                  DAOs, AppDatabase v2 (schemas in app/schemas), Migrations (plain SQL, JVM-tested)
   remote/         OkHttp + kotlinx.serialization: OpenFoodFactsApi/Parser, UsdaApi/Parser, Http (User-Agent)
   backup/         BackupCodec (pure JSON/CSV, tested) + BackupManager (SAF I/O, replace-on-import)
   Settings.kt     SettingsStore (SharedPreferences → StateFlow<AppSettings>), SecureKeys (encrypted USDA key)
   Repositories.kt FoodRepository (search/merge/cache/barcode), LogRepository, WeightRepository
+  TrainingRepository.kt  Seeding, routines (draft save keeps day ids), workouts, sets, suggestions
+  TrainingPlanner.kt     Pure: routine drafts, reorder, next-day rotation, last-session prefill (tested)
 photo/
   FoodPhotoEstimator.kt     Interface + result types
   XaiFoodPhotoEstimator.kt  xAI chat completions client (user's key, error mapping)
@@ -24,12 +33,14 @@ photo/
   PhotoReview.kt            Pure: editable ReviewItem, proportional scaling, database swap (tested)
   ImagePrep.kt              ImageDecoder downscale to 1024 px + JPEG; ImageSizing (tested)
 ui/
-  Root.kt         Navigation graph + bottom bar (Diary, Weight, Settings)
+  Root.kt         Navigation graph + bottom bar (Diary, Weight, Training, Settings)
   today/          Daily diary, calorie ring, macro bars, date navigation
   food/           Search (Recent / Favorites / My foods tabs), food detail, quick add, custom food editor
   scan/           CameraX preview + ML Kit analyzer, manual barcode entry
   photo/          Photo log: capture (CameraX ImageCapture / photo picker) → analyzing → review → log
   weight/         Trend chart, log form, history
+  training/       Training tab (Workout / History / Exercises), routine editor, split recommender, workout
+                  logger (set rows, rest timer), workout detail, exercise progress (e1RM chart, PRs), picker
   goals/          Onboarding / profile & goal form (live BMR/TDEE/target preview)
   settings/       Targets, macro split, units, USDA key, export/import, about/attribution
   components/     Charts (Canvas ring, bars, weight chart), number field, formatting
@@ -52,6 +63,38 @@ MainActivity.kt   enableEdgeToEdge() + Compose root
   exposed as a `StateFlow<AppSettings>`. The calorie target is derived, not stored.
 - **SecureKeys**: the USDA key in `EncryptedSharedPreferences` (AES-256-GCM, Keystore master key). If the
   keystore fails, saving is disabled rather than falling back to plaintext.
+
+### Training tables (added in schema v2)
+
+- **exercises**: built-ins keyed by a stable `slug` (seeded with insert-or-ignore on first use, after upgrades
+  and after import, so ids never change), custom ones with `custom-<uuid>`. Muscles are comma-separated enum names.
+- **routines** → **routine_days** → **routine_exercises** (cascade deletes; targets: sets, rep range, rest, notes).
+  The editor works on an in-memory `RoutineDraft` (saved state survives process death) and saves in one
+  transaction; existing days keep their ids so "next day" still lines up with workout history.
+- **workouts** → **workout_exercises** → **workout_sets**. `finishedAt = null` means in progress (one at a time,
+  so it survives leaving the screen or the app being killed). Workouts keep `routineId`/`routineDayId` as plain
+  ids, so deleting a routine keeps history. Exercise name and type are snapshotted; deleting a custom exercise
+  sets `exerciseId` to null (FK `SET NULL`). Each set stores **`weightKg` (canonical)** plus the `unit` it was
+  entered in; set-row edits are field-level `UPDATE`s so quick typing in two fields can't overwrite each other.
+- `AppSettings.trainingUnit` (default lb, separate from `weightUnit`) and `activeRoutineId`.
+
+### Migration 1 → 2
+
+`AppDatabase.MIGRATION_1_2` runs `Migrations.SQL_1_2`: `CREATE TABLE`/`CREATE INDEX` statements for the seven
+new tables, copied from Room's exported `2.json`. It never drops or alters the food, diary or weight tables, and
+there is no destructive fallback. `MigrationTest` (JVM, real SQLite via sqlite-jdbc) builds a v1 database from
+`1.json`, adds rows, runs the migration, and checks the data survived and that every table's columns, indices and
+foreign keys match `2.json` (what Room validates after a migration), plus the cascade / `SET NULL` behaviour.
+
+## Training flows
+
+- **Start**: `startWorkout(dayId)` creates the workout and copies the day's exercises; `addExercise` picks the unit
+  from the last session of that exercise (else the training unit) and pre-fills sets from it (`TrainingPlanner.prefill`).
+- **Suggestion**: the last two finished sessions of the exercise go to `Progression.suggest` with the rep range.
+- **Finish**: unticked or rep-less sets and empty exercises are deleted, then `finishedAt` is set.
+- **Progress**: `observeExerciseSets` joins sets with finished workouts; `Strength` builds the e1RM series and PRs.
+- **Backup**: `Backup.training` (nullable for old files) holds all seven tables; import replaces them in one
+  transaction, parents first. `BackupCodec.setsToCsv` exports finished sets.
 
 ## Food search flow
 

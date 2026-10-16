@@ -14,6 +14,7 @@ class BackupManager(
     private val db: AppDatabase,
     private val settings: SettingsStore,
     private val resolver: ContentResolver,
+    private val training: dev.glinesb.openmacros.data.TrainingRepository,
 ) {
     suspend fun exportJson(uri: Uri) = withContext(Dispatchers.IO) {
         val backup = Backup(
@@ -22,15 +23,32 @@ class BackupManager(
             foods = db.foods().all(),
             entries = db.log().all(),
             weights = db.weights().all(),
+            training = TrainingBackup(
+                exercises = db.exercises().all(),
+                routines = db.routines().routines(),
+                routineDays = db.routines().allDays(),
+                routineExercises = db.routines().allExercises(),
+                workouts = db.workouts().allWorkouts(),
+                workoutExercises = db.workouts().allExercises(),
+                workoutSets = db.workouts().allSets(),
+            ),
         )
         write(uri, BackupCodec.toJson(backup))
+    }
+
+    /** All sets from finished workouts as CSV. */
+    suspend fun exportTrainingCsv(uri: Uri) = withContext(Dispatchers.IO) {
+        write(uri, BackupCodec.setsToCsv(db.workouts().allFinishedSets()))
     }
 
     suspend fun exportCsv(uri: Uri) = withContext(Dispatchers.IO) {
         write(uri, BackupCodec.toCsv(db.log().all(), db.weights().all()))
     }
 
-    /** Replaces the diary and weights (and, for JSON, foods and settings) with the file's contents. */
+    /**
+     * Replaces the diary and weights (and, for JSON, foods and settings, plus training data when the
+     * backup has it) with the file's contents.
+     */
     suspend fun import(uri: Uri): ImportSummary = withContext(Dispatchers.IO) {
         val text = resolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
             ?: error("Couldn't open the file")
@@ -42,9 +60,24 @@ class BackupManager(
                 db.foods().insertAll(b.foods)
                 db.log().insertAll(b.entries)
                 db.weights().insertAll(b.weights)
+                b.training?.let { t ->
+                    // Parents before children; deleting workouts/routines cascades to their rows.
+                    db.workouts().deleteAll(); db.routines().deleteAll(); db.exercises().deleteAll()
+                    db.exercises().insertAll(t.exercises)
+                    db.routines().insertAllRoutines(t.routines)
+                    db.routines().insertAllDays(t.routineDays)
+                    db.routines().insertAllExercises(t.routineExercises)
+                    db.workouts().insertAllWorkouts(t.workouts)
+                    db.workouts().insertAllExercises(t.workoutExercises)
+                    db.workouts().insertAllSets(t.workoutSets)
+                }
             }
-            b.settings?.let { s -> settings.update { s } }
-            ImportSummary(b.entries.size, b.weights.size, b.foods.size)
+            b.settings?.let { s ->
+                // Pre-training backups don't know about training settings; keep the current ones then.
+                settings.update { cur -> if (b.training == null) s.copy(trainingUnit = cur.trainingUnit, activeRoutineId = cur.activeRoutineId) else s }
+            }
+            training.ensureSeeded()
+            ImportSummary(b.entries.size, b.weights.size, b.foods.size, b.training?.workouts?.count { it.finishedAt != null } ?: 0)
         } else {
             val (entries, weights) = BackupCodec.fromCsv(trimmed)
             db.withTransaction {
@@ -52,7 +85,7 @@ class BackupManager(
                 db.log().insertAll(entries)
                 db.weights().insertAll(weights)
             }
-            ImportSummary(entries.size, weights.size, 0)
+            ImportSummary(entries.size, weights.size, 0, 0)
         }
     }
 
@@ -62,5 +95,5 @@ class BackupManager(
     }
 }
 
-data class ImportSummary(val entries: Int, val weights: Int, val foods: Int)
+data class ImportSummary(val entries: Int, val weights: Int, val foods: Int, val workouts: Int = 0)
 

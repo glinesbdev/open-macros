@@ -55,6 +55,9 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
     val exportCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { u ->
         u?.let { report { c.backup.exportCsv(it); "CSV saved" } }
     }
+    val exportSetsCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { u ->
+        u?.let { report { c.backup.exportTrainingCsv(it); "Training CSV saved" } }
+    }
     val importDoc = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u -> pendingImport = u }
 
     Scaffold(
@@ -112,10 +115,17 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
             }
             item {
                 Section("Units") {
-                    Text("Weight", style = MaterialTheme.typography.labelLarge)
+                    Text("Body weight", style = MaterialTheme.typography.labelLarge)
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         WeightUnit.entries.forEachIndexed { i, u ->
                             SegmentedButton(selected = settings.weightUnit == u, onClick = { c.settings.update { it.copy(weightUnit = u) } },
+                                shape = SegmentedButtonDefaults.itemShape(i, 2)) { Text(u.symbol) }
+                        }
+                    }
+                    Text("Training weights (default; switch any exercise in a workout)", style = MaterialTheme.typography.labelLarge)
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        WeightUnit.entries.forEachIndexed { i, u ->
+                            SegmentedButton(selected = settings.trainingUnit == u, onClick = { c.settings.update { it.copy(trainingUnit = u) } },
                                 shape = SegmentedButtonDefaults.itemShape(i, 2)) { Text(u.symbol) }
                         }
                     }
@@ -166,7 +176,7 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
             }
             item {
                 Section("Your data") {
-                    Text("Your diary, foods and weigh-ins are stored only on this phone. There is no account and they are never uploaded. " +
+                    Text("Your diary, foods, weigh-ins and workouts are stored only on this phone. There is no account and they are never uploaded. " +
                         "Export a backup to move phones or keep a copy. Backups never include your API keys.",
                         style = MaterialTheme.typography.bodySmall)
                     val stamp = LocalDate.now().toString()
@@ -174,6 +184,7 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
                         FilledTonalButton(onClick = { exportJson.launch("open-macros-$stamp.json") }) { Text("Export JSON") }
                         FilledTonalButton(onClick = { exportCsv.launch("open-macros-$stamp.csv") }) { Text("Export CSV") }
                     }
+                    FilledTonalButton(onClick = { exportSetsCsv.launch("open-macros-training-sets-$stamp.csv") }) { Text("Export training sets (CSV)") }
                     OutlinedButton(onClick = { importDoc.launch(arrayOf("application/json", "text/*", "application/octet-stream")) }) {
                         Text("Import JSON or CSV…")
                     }
@@ -240,7 +251,7 @@ fun SettingsScreen(onEditProfile: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     pendingImport = null
-                    report { val s = c.backup.import(u); "Imported ${s.entries} entries, ${s.weights} weigh-ins, ${s.foods} foods" }
+                    report { val s = c.backup.import(u); "Imported ${s.entries} entries, ${s.weights} weigh-ins, ${s.foods} foods" + if (s.workouts > 0) ", ${s.workouts} workouts" else "" }
                 }) { Text("Import") }
             },
             dismissButton = { TextButton(onClick = { pendingImport = null }) { Text("Cancel") } },
