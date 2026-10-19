@@ -5,6 +5,19 @@ package dev.glinesb.openmacros.data.db
  * and check the result against Room's exported schema (app/schemas).
  */
 object Migrations {
+    /** Flags bodyweight exercises and turns their 0-weight sets into plain BW (null). Also run after old-backup import. */
+    val BODYWEIGHT_FIXUP: List<String> = listOf(
+        "UPDATE `workout_exercises` SET `isBodyweight` = 1 WHERE `exerciseId` IN " +
+            "(SELECT `id` FROM `exercises` WHERE (`equipment` = 'BODYWEIGHT' AND `type` != 'CARDIO') OR `slug` = 'assisted-pull-up')",
+        "UPDATE `workout_sets` SET `weightKg` = NULL WHERE `weightKg` = 0 AND `workoutExerciseId` IN " +
+            "(SELECT `id` FROM `workout_exercises` WHERE `isBodyweight` = 1)",
+    )
+
+    /** v2 → v3: adds `isBodyweight` (default 0) to workout_exercises, then [BODYWEIGHT_FIXUP]. No drops. */
+    val SQL_2_3: List<String> = listOf(
+        "ALTER TABLE `workout_exercises` ADD COLUMN `isBodyweight` INTEGER NOT NULL DEFAULT 0",
+    ) + BODYWEIGHT_FIXUP
+
     /** v1 → v2: adds the training tables. Creates only; never drops or alters existing tables. */
     val SQL_1_2: List<String> = listOf(
         "CREATE TABLE IF NOT EXISTS `exercises` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `slug` TEXT NOT NULL, `name` TEXT NOT NULL, `primaryMuscles` TEXT NOT NULL, `secondaryMuscles` TEXT NOT NULL, `equipment` TEXT NOT NULL, `type` TEXT NOT NULL, `isCustom` INTEGER NOT NULL)",

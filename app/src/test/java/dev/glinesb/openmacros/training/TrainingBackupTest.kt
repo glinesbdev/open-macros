@@ -47,17 +47,20 @@ class TrainingBackupTest {
 
     @Test fun setsCsv() {
         val rows = listOf(
-            SetRow(1, "Upper, A", 20000, 0, 1, 1, "Bench", "COMPOUND", 0, 1, 0, "WARMUP", 5, 60.0, "KG", true),
-            SetRow(1, "Upper, A", 20000, 0, 1, 1, "Bench", "COMPOUND", 0, 2, 1, "WORKING", 5, Units.lbToKg(225.0), "LB", true),
-            SetRow(1, "Upper, A", 20000, 0, 2, 2, "Rowing Machine", "CARDIO", 1, 3, 0, "WORKING", 20, null, "LB", true),
+            SetRow(1, "Upper, A", 20000, 0, 1, 1, "Bench", "COMPOUND", 0, false, 1, 0, "WARMUP", 5, 60.0, "KG", true),
+            SetRow(1, "Upper, A", 20000, 0, 1, 1, "Bench", "COMPOUND", 0, false, 2, 1, "WORKING", 5, Units.lbToKg(225.0), "LB", true),
+            SetRow(1, "Upper, A", 20000, 0, 2, 2, "Rowing Machine", "CARDIO", 1, false, 3, 0, "WORKING", 20, null, "LB", true),
         )
         val lines = BackupCodec.setsToCsv(rows).trim().lines()
-        assertEquals("date,workout,exercise,set,set_type,reps,weight,unit,weight_kg,e1rm_kg", lines[0])
-        assertEquals("2024-10-04,\"Upper, A\",Bench,1,warmup,5,60,kg,60,", lines[1])
+        assertEquals("date,workout,exercise,set,set_type,reps,weight,unit,weight_kg,e1rm_kg,bodyweight", lines[0])
+        assertEquals("2024-10-04,\"Upper, A\",Bench,1,warmup,5,60,kg,60,,", lines[1])
         val f = BackupCodec.parseCsv(lines[2] + "\n").single()
         assertEquals("225", f[6]); assertEquals("lb", f[7])
         assertEquals(102.058, f[8].toDouble(), 1e-3)
         assertEquals(119.07, f[9].toDouble(), 1e-2) // Epley on kg
-        assertEquals("2024-10-04,\"Upper, A\",Rowing Machine,1,working,20,,,,", lines[3])
+        assertEquals("2024-10-04,\"Upper, A\",Rowing Machine,1,working,20,,,,,", lines[3])
+        val bw = BackupCodec.setsToCsv(listOf(SetRow(1, "Pull", 20000, 0, 3, 3, "Pull-Up", "COMPOUND", 0, true, 4, 0, "WORKING", 8,
+            Units.lbToKg(25.0), "LB", true))).trim().lines()[1]
+        assertEquals("2024-10-04,Pull,Pull-Up,1,working,8,25,lb,11.34,,yes", bw.replace(Regex("11\\.3\\d+"), "11.34"))
     }
 }

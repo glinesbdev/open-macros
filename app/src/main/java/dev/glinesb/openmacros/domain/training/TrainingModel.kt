@@ -21,6 +21,13 @@ enum class Equipment(val label: String) {
     KETTLEBELL("Kettlebell"), BAND("Band"), EZ_BAR("EZ bar"), TRAP_BAR("Trap bar"), OTHER("Other"),
 }
 
+/**
+ * True for exercises where the load is your body (push-ups, pull-ups, dips…): sets log "BW" plus optional
+ * added weight (+) or assistance (−). Cardio is excluded; the assisted pull-up machine counts (assistance).
+ */
+fun isBodyweightLoad(equipment: Equipment, type: ExerciseType, slug: String): Boolean =
+    (equipment == Equipment.BODYWEIGHT && type != ExerciseType.CARDIO) || slug == "assisted-pull-up"
+
 enum class ExerciseType(val label: String) { COMPOUND("Compound"), ISOLATION("Isolation"), CARDIO("Cardio") }
 
 enum class SetType(val label: String, val short: String) { WARMUP("Warm-up", "W"), WORKING("Working", "") }

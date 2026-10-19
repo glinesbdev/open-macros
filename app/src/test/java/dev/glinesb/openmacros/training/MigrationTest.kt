@@ -18,7 +18,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 
 /**
- * Runs the real v1 → v2 migration SQL on SQLite (sqlite-jdbc) against a v1 database built from
+ * Runs the real migration SQL (v1 → v2 → v3) on SQLite (sqlite-jdbc) against a v1 database built from
  * Room's exported schema, then checks that:
  *  - existing food, diary and weight rows survive untouched;
  *  - every table, column (type, NOT NULL, primary key, default), index and foreign key matches the
@@ -75,8 +75,12 @@ class MigrationTest {
         assertEquals(listOf(300.0), query("SELECT kcal FROM log_entries WHERE id = 7") { it.getDouble(1) })
         assertEquals(listOf(81.5), query("SELECT weightKg FROM weights") { it.getDouble(1) })
 
-        // Every table matches what Room expects for version 2.
-        for (e in schema(2)["entities"]!!.jsonArray.map { it.jsonObject }) {
+        assertMatchesSchema(2)
+    }
+
+    /** Every table's columns (type, NOT NULL, pk, default), indices and foreign keys match Room's exported schema. */
+    private fun assertMatchesSchema(version: Int) {
+        for (e in schema(version)["entities"]!!.jsonArray.map { it.jsonObject }) {
             val t = e.str("tableName")
             val cols = query("PRAGMA table_info(`$t`)") { rs ->
                 listOf(rs.getString("name"), rs.getString("type"), rs.getInt("notnull") == 1, rs.getInt("pk"), rs.getString("dflt_value")).joinToString("|")
@@ -104,7 +108,37 @@ class MigrationTest {
             assertEquals("foreign keys of $t", expectedFks, fks)
         }
         val tables = query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'room_master_table'") { it.getString(1) }.toSet()
-        assertEquals(schema(2)["entities"]!!.jsonArray.map { it.jsonObject.str("tableName") }.toSet(), tables)
+        assertEquals(schema(version)["entities"]!!.jsonArray.map { it.jsonObject.str("tableName") }.toSet(), tables)
+    }
+
+    private fun insertTrainingRows() {
+        exec("INSERT INTO exercises (id, slug, name, primaryMuscles, secondaryMuscles, equipment, type, isCustom) VALUES " +
+            "(1, 'pull-up', 'Pull-Up', 'LATS', '', 'BODYWEIGHT', 'COMPOUND', 0), (2, 'barbell-row', 'Barbell Row', 'UPPER_BACK', '', 'BARBELL', 'COMPOUND', 0), " +
+            "(3, 'running', 'Running', 'CARDIOVASCULAR', '', 'BODYWEIGHT', 'CARDIO', 0)")
+        exec("INSERT INTO workouts (id, name, epochDay, startedAt, finishedAt, routineId, routineDayId, notes) VALUES (1, 'Pull', 20000, 0, 1, NULL, NULL, '')")
+        exec("INSERT INTO workout_exercises (id, workoutId, exerciseId, name, type, position, unit, repMin, repMax, restSeconds, notes) VALUES " +
+            "(1, 1, 1, 'Pull-Up', 'COMPOUND', 0, 'LB', 6, 10, 120, ''), (2, 1, 2, 'Barbell Row', 'COMPOUND', 1, 'LB', 6, 10, 120, ''), " +
+            "(3, 1, 3, 'Running', 'CARDIO', 2, 'LB', 20, 30, 0, '')")
+        exec("INSERT INTO workout_sets (id, workoutExerciseId, position, setType, reps, weightKg, unit, done) VALUES " +
+            "(1, 1, 0, 'WORKING', 10, 0.0, 'LB', 1), (2, 1, 1, 'WORKING', 8, 11.34, 'LB', 1), (3, 2, 0, 'WORKING', 8, 0.0, 'LB', 1), (4, 3, 0, 'WORKING', 25, 0.0, 'LB', 1)")
+    }
+
+    @Test fun migrate2to3FlagsBodyweightAndTurnsZeroWeightIntoBw() {
+        Migrations.SQL_1_2.forEach(::exec)
+        insertTrainingRows()
+        Migrations.SQL_2_3.forEach(::exec)
+        assertMatchesSchema(3)
+        assertEquals(listOf("1|1", "2|0", "3|0"), query("SELECT id, isBodyweight FROM workout_exercises ORDER BY id") { "${it.getLong(1)}|${it.getInt(2)}" })
+        val w = query("SELECT id, weightKg FROM workout_sets ORDER BY id") { rs -> rs.getLong(1) to rs.getDouble(2).takeUnless { rs.wasNull() } }
+        assertEquals(listOf(1L to null, 2L to 11.34, 3L to 0.0, 4L to 0.0), w) // only the pull-up's 0-lb set became BW
+        assertEquals(listOf(81.5), query("SELECT weightKg FROM weights") { it.getDouble(1) })
+        assertTrue(Migrations.SQL_2_3.none { it.contains("DROP", ignoreCase = true) })
+    }
+
+    @Test fun migrate1to3MatchesLatestSchema() {
+        (Migrations.SQL_1_2 + Migrations.SQL_2_3).forEach(::exec)
+        assertMatchesSchema(3)
+        assertEquals(listOf(300.0), query("SELECT kcal FROM log_entries WHERE id = 7") { it.getDouble(1) })
     }
 
     @Test fun newTablesCascadeAndKeepHistoryWhenACustomExerciseIsDeleted() {

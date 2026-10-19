@@ -160,13 +160,44 @@ of the range two sessions running, drop about 10 %. **Apply** fills the suggesti
 
 **Backups.** The JSON backup includes the exercise library, routines and workouts (older backups without training
 data import fine and leave training data alone). Settings → Your data → **Export training sets (CSV)** writes one row
-per set: `date, workout, exercise, set, set_type, reps, weight, unit, weight_kg, e1rm_kg`.
+per set: `date, workout, exercise, set, set_type, reps, weight, unit, weight_kg, e1rm_kg, bodyweight`. For bodyweight
+sets `weight` is the added load (negative = assistance, blank = plain BW), `bodyweight` is `yes` and `e1rm_kg` is blank.
+
+**Bodyweight exercises.** Exercises tagged bodyweight (pull-up, chin-up, Body Dips, push-up, inverted row, assisted
+pull-up, …) log **BW** by default: leave the weight blank for plain bodyweight, enter `25` for +25 lb on a belt or vest,
+or `-40` for 40 lb of assistance. Sets read `BW × 10`, `BW + 25 lb × 8` or `BW − 40 lb × 6`. For e1RM, heaviest set,
+volume and PRs the app uses your latest weigh-in on or before that day plus the added load, and labels those numbers
+"incl. body weight". With no weigh-ins it can't know the load, so it tracks rep-based PRs (most reps) only. Progression
+suggestions add the increment as extra load (or remove that much assistance). Upgrading migrates the database to v3:
+existing 0-lb sets on bodyweight exercises become BW.
 
 References behind the recommender: Schoenfeld, Ogborn & Krieger 2016 (training frequency, *Sports Med*
 46:1689); Schoenfeld, Ogborn & Krieger 2017 (weekly volume dose-response, *J Sports Sci* 35:1073); Schoenfeld et al.
 2017 (low vs high loads, *J Strength Cond Res* 31:3508); Schoenfeld et al. 2016 (longer rest periods, *J Strength
 Cond Res* 30:1805); Helms, Aragon & Fitschen 2014 (contest prep, 0.5–1 % a week loss, *JISSN* 11:20); Iraki et al.
 2019 (off-season gain rate, *Sports* 7:154). These are general guidelines, not personal coaching or medical advice.
+
+## Signing: CI builds install over each other
+
+CI signs debug APKs with a **stable debug key** kept in GitHub Actions secrets, so each new CI build installs
+as an update over the last one (no uninstall, data kept). The keystore itself is never in the repo.
+
+- Secrets (Settings → Secrets and variables → Actions): `SIGNING_KEYSTORE_B64` (base64 of the keystore),
+  `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
+- The workflow decodes the keystore to `$RUNNER_TEMP`, sets `SIGNING_KEYSTORE_PATH`, passes the passwords as
+  env vars to Gradle, and deletes the file afterwards. The workflow source is in [`ci/android.yml`](ci/android.yml)
+  (copy it to `.github/workflows/android.yml`).
+- `app/build.gradle.kts` uses the stable key for the `debug` build type only when the keystore path and all
+  three values are present (env vars, or `signing.storeFile` / `signing.storePassword` / `signing.keyAlias` /
+  `signing.keyPassword` in your gitignored `local.properties`). Otherwise it uses the normal Android debug
+  key, so local builds and **pull requests from forks (which get no secrets) still build**. The build log says
+  which key was used.
+- CI sets `versionCode = 100 + GITHUB_RUN_NUMBER`, so every CI build has a higher version code. Local builds
+  keep the low default and won't install over a CI build without uninstalling (signatures differ anyway).
+
+**Switching to the stable key:** APKs signed with the old default debug key can't be updated by ones signed with
+the new key. Uninstall the app **one last time** (export a backup first if the app has data you want), then
+install the new CI build. From then on, CI builds update in place.
 
 ## Data sources and attribution
 

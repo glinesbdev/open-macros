@@ -46,6 +46,21 @@ object Strength {
         .mapNotNull { s -> s.working.maxOfOrNull { it.reps ?: 0 }?.takeIf { it > 0 }?.let { DatedValue(s.epochDay, it.toDouble()) } }
         .groupBy { it.epochDay }.map { (d, v) -> DatedValue(d, v.maxOf { it.value }) }.sortedBy { it.epochDay }
 
+    /** Body weight for a day: the latest weigh-in on or before it, else the earliest one after. Null with no weigh-ins. */
+    fun bodyweightOn(day: Long, weighIns: List<DatedValue>): Double? =
+        weighIns.filter { it.epochDay <= day }.maxByOrNull { it.epochDay }?.value
+            ?: weighIns.minByOrNull { it.epochDay }?.value
+
+    /**
+     * For bodyweight exercises, where a set's weightKg is the added (+) or assisted (−) load: replaces it
+     * with body weight + added, so e1RM, volume and PRs reflect the real load. Without a body weight the
+     * load is unknown, so weights become null and only rep-based numbers remain.
+     */
+    fun withBodyweight(sessions: List<Session>, weighIns: List<DatedValue>): List<Session> = sessions.map { s ->
+        val bw = bodyweightOn(s.epochDay, weighIns)
+        s.copy(sets = s.sets.map { set -> set.copy(weightKg = bw?.let { (it + (set.weightKg ?: 0.0)).takeIf { kg -> kg > 0 } }) })
+    }
+
     fun volumeKg(sets: List<LoggedSet>): Double = sets.filter { it.isWorking }.sumOf { (it.weightKg ?: 0.0) * (it.reps ?: 0) }
 
     /** PRs over working sets only (warm-ups never count). Ties keep the earliest date. */
@@ -94,6 +109,8 @@ object Progression {
         type: ExerciseType,
         unit: WeightUnit,
         previous: List<LoggedSet>? = null,
+        /** Bodyweight exercise: weights are added (+) / assisted (−) load and "no weight" means plain BW. */
+        bodyweight: Boolean = false,
     ): ProgressionSuggestion? {
         if (type == ExerciseType.CARDIO) return null
         val working = last.filter { it.isWorking }
@@ -103,6 +120,7 @@ object Progression {
         val inc = increment(type, unit)
         val reps = working.map { it.reps ?: 0 }
 
+        if (bodyweight) return suggestBodyweight(working, reps, repMin, repMax, inc, unit, previous)
         if (reps.all { it >= repMax }) {
             if (topKg <= 0.0) return ProgressionSuggestion(
                 ProgressionAction.ADD_LOAD, null, repMin,
@@ -130,6 +148,37 @@ object Progression {
             if (topKg > 0) "Stay at ${fmt(topDisplay)} ${unit.symbol} and add reps until every set hits $repMax."
             else "Add reps until every set hits $repMax.",
         )
+    }
+
+    private fun suggestBodyweight(
+        working: List<LoggedSet>, reps: List<Int>, repMin: Int, repMax: Int, inc: Double, unit: WeightUnit, previous: List<LoggedSet>?,
+    ): ProgressionSuggestion {
+        val added = Units.toDisplayWeight(working.maxOf { it.weightKg ?: 0.0 }, unit)
+        if (reps.all { it >= repMax }) {
+            val next = added + inc
+            return ProgressionSuggestion(
+                ProgressionAction.INCREASE_WEIGHT, Units.fromDisplayWeight(next, unit), repMin,
+                "Every set hit $repMax. Go to ${bw(next, unit)} (${if (added < 0) "less assistance" else "add weight"}) and aim for $repMin+ reps.",
+            )
+        }
+        val prevWorking = previous?.filter { it.isWorking }.orEmpty()
+        if (reps.all { it < repMin } && prevWorking.isNotEmpty() && prevWorking.all { (it.reps ?: 0) < repMin }) {
+            val next = added - inc
+            return ProgressionSuggestion(
+                ProgressionAction.DELOAD, Units.fromDisplayWeight(next, unit), repMax,
+                "Below $repMin reps two sessions running. Try ${bw(next, unit)} and build back up.",
+            )
+        }
+        val target = (reps.minOrNull() ?: repMin).coerceAtLeast(repMin - 1) + 1
+        return ProgressionSuggestion(ProgressionAction.ADD_REPS, null, target.coerceAtMost(repMax),
+            "Stay at ${bw(added, unit)} and add reps until every set hits $repMax.")
+    }
+
+    /** "BW", "BW + 25 lb" or "BW − 20 lb" from a display-unit added load. */
+    fun bw(addedDisplay: Double, unit: WeightUnit): String = when {
+        addedDisplay > 0.004 -> "BW + ${fmt(addedDisplay)} ${unit.symbol}"
+        addedDisplay < -0.004 -> "BW − ${fmt(-addedDisplay)} ${unit.symbol}"
+        else -> "BW"
     }
 
     fun roundTo(value: Double, step: Double): Double = (value / step).roundToLong() * step

@@ -36,7 +36,7 @@ object ExerciseLibrary {
         e("pec-deck", "Pec Deck", listOf(CHEST), listOf(FRONT_DELTS), MACHINE, ISOLATION),
         e("push-up", "Push-Up", listOf(CHEST), listOf(TRICEPS, FRONT_DELTS, ABS), BODYWEIGHT, COMPOUND),
         e("decline-push-up", "Decline Push-Up", listOf(CHEST), listOf(FRONT_DELTS, TRICEPS), BODYWEIGHT, COMPOUND),
-        e("dip", "Dip", listOf(CHEST, TRICEPS), listOf(FRONT_DELTS), BODYWEIGHT, COMPOUND),
+        e("dip", "Body Dips", listOf(CHEST, TRICEPS), listOf(FRONT_DELTS), BODYWEIGHT, COMPOUND),
         // Back
         e("deadlift", "Deadlift", listOf(HAMSTRINGS, GLUTES, LOWER_BACK), listOf(UPPER_BACK, TRAPS, QUADS, FOREARMS), BARBELL, COMPOUND),
         e("trap-bar-deadlift", "Trap Bar Deadlift", listOf(QUADS, GLUTES, HAMSTRINGS), listOf(LOWER_BACK, TRAPS, FOREARMS), TRAP_BAR, COMPOUND),

@@ -1,5 +1,6 @@
 package dev.glinesb.openmacros.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -32,6 +33,7 @@ data class ExerciseEntity(
 ) {
     val exerciseType: ExerciseType get() = runCatching { ExerciseType.valueOf(type) }.getOrDefault(ExerciseType.COMPOUND)
     val equipmentType: Equipment get() = runCatching { Equipment.valueOf(equipment) }.getOrDefault(Equipment.OTHER)
+    val isBodyweight: Boolean get() = dev.glinesb.openmacros.domain.training.isBodyweightLoad(equipmentType, exerciseType, slug)
     val primary: List<Muscle> get() = Muscle.parseList(primaryMuscles)
     val secondary: List<Muscle> get() = Muscle.parseList(secondaryMuscles)
 }
@@ -123,12 +125,17 @@ data class WorkoutExerciseEntity(
     val repMax: Int? = null,
     val restSeconds: Int = 90,
     val notes: String = "",
+    /** Bodyweight exercise (snapshotted): set weights are added (+) / assisted (−) load, null = plain BW. */
+    @ColumnInfo(defaultValue = "0") val isBodyweight: Boolean = false,
 ) {
     val weightUnit: WeightUnit get() = runCatching { WeightUnit.valueOf(unit) }.getOrDefault(WeightUnit.LB)
     val exerciseType: ExerciseType get() = runCatching { ExerciseType.valueOf(type) }.getOrDefault(ExerciseType.COMPOUND)
 }
 
-/** One set. Weight is canonical kg; [unit] is the unit it was entered in, used for display. For cardio, [reps] is minutes. */
+/**
+ * One set. Weight is canonical kg; [unit] is the unit it was entered in, used for display. For cardio, [reps]
+ * is minutes. For bodyweight exercises, weight is the added (+) or assisted (−) load and null means plain BW.
+ */
 @Serializable
 @Entity(
     tableName = "workout_sets",

@@ -70,6 +70,8 @@ class BackupManager(
                     db.workouts().insertAllWorkouts(t.workouts)
                     db.workouts().insertAllExercises(t.workoutExercises)
                     db.workouts().insertAllSets(t.workoutSets)
+                    // Backups from before bodyweight sets: flag bodyweight exercises, 0-weight sets become BW.
+                    if (b.version < 3) db.openHelper.writableDatabase.let { w -> dev.glinesb.openmacros.data.db.Migrations.BODYWEIGHT_FIXUP.forEach(w::execSQL) }
                 }
             }
             b.settings?.let { s ->

@@ -250,12 +250,14 @@ private fun ExerciseCard(
                 if (we.repMin != null || we.repMax != null) add(if (cardio) "${repRange(we.repMin, we.repMax)} min" else "${repRange(we.repMin, we.repMax)} reps")
                 if (!cardio && we.restSeconds > 0) add("rest ${restLabel(we.restSeconds)}")
             }.joinToString(" · ")
+            if (we.isBodyweight) Text("Bodyweight: leave weight blank for BW, enter added weight (25) or assistance (-20).",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (target.isNotEmpty()) Text("Target $target", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (we.notes.isNotBlank()) Text(we.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val lastWorking = last.filter { it.type == SetType.WORKING }
             if (lastWorking.isNotEmpty()) Text(
                 "Last time: " + lastWorking.joinToString(", ") { s ->
-                    if (cardio) "${s.reps ?: "–"} min" else "${weightText(s.weightKg, s.weightUnit).ifEmpty { "BW" }}×${s.reps ?: "–"}"
+                    setLabel(s.reps, s.weightKg, s.weightUnit, we.isBodyweight, cardio)
                 },
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -271,7 +273,7 @@ private fun ExerciseCard(
             }
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Set", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(44.dp), textAlign = TextAlign.Center)
-                if (!cardio) Text(unit.symbol, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                if (!cardio) Text(if (we.isBodyweight) "BW ± ${unit.symbol}" else unit.symbol, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Text(if (cardio) "Minutes" else "Reps", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Text("Done", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(48.dp), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(40.dp))
@@ -281,7 +283,7 @@ private fun ExerciseCard(
                 val label = if (set.type == SetType.WARMUP) "W" else "${++workingNo}"
                 key(set.id) {
                     SetRow(
-                        set = set, label = label, cardio = cardio, version = version,
+                        set = set, label = label, cardio = cardio, bodyweight = we.isBodyweight, version = version,
                         onReps = { v -> scope.launch { c.training.setReps(set.id, v) } },
                         onWeight = { kg -> scope.launch { c.training.setWeight(set.id, kg) } },
                         onType = { t -> scope.launch { c.training.setType(set.id, t) } },
@@ -307,6 +309,7 @@ private fun SetRow(
     set: WorkoutSetEntity,
     label: String,
     cardio: Boolean,
+    bodyweight: Boolean,
     version: Int,
     onReps: (Int?) -> Unit,
     onWeight: (Double?) -> Unit,
@@ -328,7 +331,9 @@ private fun SetRow(
                 w = v
                 val n = v.toNumberOrNull()
                 onWeight(n?.let { Units.fromDisplayWeight(it, set.weightUnit) })
-            }, "", Modifier.weight(1f).padding(horizontal = 4.dp))
+            }, "", Modifier.weight(1f).padding(horizontal = 4.dp),
+                // Bodyweight: blank = BW, "25" = BW + 25, "-20" = 20 of assistance.
+                allowNegative = bodyweight, placeholder = if (bodyweight) "BW" else null)
             CompactNumberField(r, { v ->
                 r = v
                 onReps(v.toIntOrNull())

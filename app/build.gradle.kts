@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,6 +8,26 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// ---- Stable debug signing (see README "Signing") ----
+// CI decodes the SIGNING_KEYSTORE_B64 secret to a temp file and sets SIGNING_KEYSTORE_PATH plus the
+// password/alias env vars. Locally you can point local.properties (gitignored) at a keystore kept outside
+// the repo. With neither, the default Android debug key is used, so builds never fail for lack of secrets.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+fun signingValue(env: String, prop: String): String? =
+    System.getenv(env)?.takeIf { it.isNotBlank() } ?: localProps.getProperty(prop)?.takeIf { it.isNotBlank() }
+val stableKeystore: File? = signingValue("SIGNING_KEYSTORE_PATH", "signing.storeFile")?.let { File(it) }?.takeIf { it.isFile }
+val stableStorePassword = signingValue("SIGNING_STORE_PASSWORD", "signing.storePassword")
+val stableKeyAlias = signingValue("SIGNING_KEY_ALIAS", "signing.keyAlias")
+val stableKeyPassword = signingValue("SIGNING_KEY_PASSWORD", "signing.keyPassword")
+val useStableSigning = stableKeystore != null && stableStorePassword != null && stableKeyAlias != null && stableKeyPassword != null
+logger.lifecycle(if (useStableSigning) "Debug signing: stable key" else "Debug signing: default debug key")
+
+// CI builds take their versionCode from the run number so every new build installs as an update.
+val ciRunNumber: Int? = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+
+
 android {
     namespace = "dev.glinesb.openmacros"
     compileSdk = 36
@@ -13,10 +35,24 @@ android {
         applicationId = "dev.glinesb.openmacros"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
+        // Local builds stay at 2; CI uses 100 + run number (always higher, always increasing).
+        versionCode = ciRunNumber?.let { 100 + it } ?: 2
         versionName = "0.2.0"
         // Phones (arm) + x86_64 emulators. Drops 32-bit x86 to keep the ML Kit native lib smaller.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+    }
+    signingConfigs {
+        if (useStableSigning) create("stableDebug") {
+            storeFile = stableKeystore
+            storePassword = stableStorePassword
+            keyAlias = stableKeyAlias
+            keyPassword = stableKeyPassword
+        }
+    }
+    buildTypes {
+        getByName("debug") {
+            if (useStableSigning) signingConfig = signingConfigs.getByName("stableDebug")
+        }
     }
     buildFeatures {
         compose = true

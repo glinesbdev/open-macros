@@ -134,6 +134,7 @@ data class SetRow(
     val exerciseName: String,
     val exerciseType: String,
     val exercisePosition: Int,
+    val isBodyweight: Boolean = false,
     val setId: Long,
     val setPosition: Int,
     val setType: String,
@@ -174,7 +175,7 @@ interface WorkoutDao {
             "(SELECT COUNT(*) FROM workout_exercises we WHERE we.workoutId = w.id) AS exerciseCount, " +
             "(SELECT COUNT(*) FROM workout_sets s JOIN workout_exercises we ON we.id = s.workoutExerciseId WHERE we.workoutId = w.id AND s.setType = 'WORKING') AS setCount, " +
             "(SELECT COALESCE(SUM(COALESCE(s.weightKg, 0) * COALESCE(s.reps, 0)), 0) FROM workout_sets s JOIN workout_exercises we ON we.id = s.workoutExerciseId " +
-            "WHERE we.workoutId = w.id AND s.setType = 'WORKING' AND we.type != 'CARDIO') AS volumeKg " +
+            "WHERE we.workoutId = w.id AND s.setType = 'WORKING' AND we.type != 'CARDIO' AND we.isBodyweight = 0) AS volumeKg " +
             "FROM workouts w WHERE w.finishedAt IS NOT NULL ORDER BY w.startedAt DESC",
     )
     fun observeHistory(): Flow<List<WorkoutSummary>>
@@ -200,7 +201,7 @@ interface WorkoutDao {
     /** Every set of an exercise across finished workouts, oldest first. */
     @Query(
         "SELECT w.id AS workoutId, w.name AS workoutName, w.epochDay, w.startedAt, we.id AS workoutExerciseId, we.exerciseId, " +
-            "we.name AS exerciseName, we.type AS exerciseType, we.position AS exercisePosition, s.id AS setId, s.position AS setPosition, " +
+            "we.name AS exerciseName, we.type AS exerciseType, we.position AS exercisePosition, we.isBodyweight, s.id AS setId, s.position AS setPosition, " +
             "s.setType, s.reps, s.weightKg, s.unit, s.done " +
             "FROM workout_sets s JOIN workout_exercises we ON we.id = s.workoutExerciseId JOIN workouts w ON w.id = we.workoutId " +
             "WHERE we.exerciseId = :exerciseId AND w.finishedAt IS NOT NULL ORDER BY w.startedAt, s.position",
@@ -209,7 +210,7 @@ interface WorkoutDao {
 
     @Query(
         "SELECT w.id AS workoutId, w.name AS workoutName, w.epochDay, w.startedAt, we.id AS workoutExerciseId, we.exerciseId, " +
-            "we.name AS exerciseName, we.type AS exerciseType, we.position AS exercisePosition, s.id AS setId, s.position AS setPosition, " +
+            "we.name AS exerciseName, we.type AS exerciseType, we.position AS exercisePosition, we.isBodyweight, s.id AS setId, s.position AS setPosition, " +
             "s.setType, s.reps, s.weightKg, s.unit, s.done " +
             "FROM workout_sets s JOIN workout_exercises we ON we.id = s.workoutExerciseId JOIN workouts w ON w.id = we.workoutId " +
             "WHERE w.finishedAt IS NOT NULL ORDER BY w.startedAt, we.position, s.position",

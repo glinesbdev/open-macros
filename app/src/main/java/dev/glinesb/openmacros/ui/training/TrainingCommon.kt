@@ -41,6 +41,18 @@ enum class MuscleGroup(val label: String, val muscles: Set<Muscle>) {
 
 fun weightText(kg: Double?, unit: WeightUnit): String = kg?.let { Units.toDisplayWeight(it, unit).trimmed(2) }.orEmpty()
 
+/** "BW", "BW + 25 lb" or "BW − 20 lb" for a bodyweight set's added (+) / assisted (−) load in kg. */
+fun bwText(addedKg: Double?, unit: WeightUnit): String =
+    dev.glinesb.openmacros.domain.training.Progression.bw(addedKg?.let { Units.toDisplayWeight(it, unit) } ?: 0.0, unit)
+
+/** One set as text: "135 lb × 10", "BW × 10", "BW + 25 lb × 8", "30 min". */
+fun setLabel(reps: Int?, kg: Double?, unit: WeightUnit, bodyweight: Boolean, cardio: Boolean): String = when {
+    cardio -> "${reps ?: "–"} min"
+    bodyweight -> "${bwText(kg, unit)} × ${reps ?: "–"}"
+    kg == null -> "– × ${reps ?: "–"}"
+    else -> "${weightText(kg, unit)} ${unit.symbol} × ${reps ?: "–"}"
+}
+
 fun repRange(min: Int?, max: Int?): String = when {
     min == null && max == null -> ""
     min == null || max == null || min == max -> "${min ?: max}"
@@ -190,6 +202,10 @@ fun CustomExerciseDialog(
 
 /** Small numeric field for set rows and routine targets. */
 @Composable
-fun CompactNumberField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier, decimal: Boolean = true) {
-    dev.glinesb.openmacros.ui.components.NumberField(value, onValueChange, label, modifier, decimal = decimal)
+fun CompactNumberField(
+    value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier, decimal: Boolean = true,
+    allowNegative: Boolean = false, placeholder: String? = null,
+) {
+    dev.glinesb.openmacros.ui.components.NumberField(value, onValueChange, label, modifier, decimal = decimal,
+        allowNegative = allowNegative, placeholder = placeholder)
 }

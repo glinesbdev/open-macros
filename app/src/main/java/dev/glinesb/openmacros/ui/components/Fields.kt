@@ -19,10 +19,16 @@ fun NumberField(
     decimal: Boolean = true,
     supportingText: String? = null,
     isError: Boolean = false,
+    allowNegative: Boolean = false,
+    placeholder: String? = null,
 ) {
     OutlinedTextField(
         value = value,
-        onValueChange = { v -> if (v.all { it.isDigit() || (decimal && (it == '.' || it == ',')) }) onValueChange(v) },
+        onValueChange = { v ->
+            val body = if (allowNegative) v.removePrefix("-") else v
+            if (body.all { it.isDigit() || (decimal && (it == '.' || it == ',')) }) onValueChange(v)
+        },
+        placeholder = placeholder?.let { { Text(it) } },
         label = { Text(label) },
         suffix = suffix?.let { { Text(it) } },
         singleLine = true,

@@ -44,8 +44,13 @@ class TrainingRepository(private val db: AppDatabase, private val settings: Sett
 
     /** Adds any built-in exercises that aren't in the database yet (first launch, upgrades, after import). */
     suspend fun ensureSeeded() = seedLock.withLock {
-        if (exercises.builtInCount() >= ExerciseLibrary.SEED.size) return@withLock
-        exercises.insertIgnore(ExerciseLibrary.SEED.map(TrainingPlanner::seedEntity))
+        if (exercises.builtInCount() < ExerciseLibrary.SEED.size) exercises.insertIgnore(ExerciseLibrary.SEED.map(TrainingPlanner::seedEntity))
+        // Keep built-ins in sync with the bundled library (e.g. renamed "Dip" → "Body Dips"); ids stay the same.
+        val seeds = ExerciseLibrary.bySlug
+        exercises.all().filter { !it.isCustom }.forEach { e ->
+            val want = seeds[e.slug]?.let(TrainingPlanner::seedEntity)?.copy(id = e.id) ?: return@forEach
+            if (want != e) exercises.update(want)
+        }
     }
 
     // ---- Exercises ----
@@ -181,6 +186,7 @@ class TrainingRepository(private val db: AppDatabase, private val settings: Sett
                 repMin = repMin ?: last?.repMin ?: defaultRange(ex.exerciseType)?.first,
                 repMax = repMax ?: last?.repMax ?: defaultRange(ex.exerciseType)?.last,
                 restSeconds = restSeconds ?: last?.restSeconds ?: if (cardio) 0 else 90, notes = notes,
+                isBodyweight = ex.isBodyweight,
             ),
         )
         val lastSets = last?.let { workouts.sets(it.id) }.orEmpty()
@@ -211,6 +217,7 @@ class TrainingRepository(private val db: AppDatabase, private val settings: Sett
         return Progression.suggest(
             workouts.sets(last.id).map { it.toLogged() }, repMin, repMax, we.exerciseType, we.weightUnit,
             recent.getOrNull(1)?.let { p -> workouts.sets(p.id).map { it.toLogged() } },
+            bodyweight = we.isBodyweight,
         )
     }
 

@@ -19,7 +19,7 @@ domain/         Pure Kotlin, no Android: unit-tested
                          nutrition-goal suggestion
 data/
   db/             Room: FoodEntity, LogEntryEntity, WeightEntity, training entities (TrainingEntities.kt),
-                  DAOs, AppDatabase v2 (schemas in app/schemas), Migrations (plain SQL, JVM-tested)
+                  DAOs, AppDatabase v3 (schemas in app/schemas), Migrations (plain SQL, JVM-tested)
   remote/         OkHttp + kotlinx.serialization: OpenFoodFactsApi/Parser, UsdaApi/Parser, Http (User-Agent)
   backup/         BackupCodec (pure JSON/CSV, tested) + BackupManager (SAF I/O, replace-on-import)
   Settings.kt     SettingsStore (SharedPreferences → StateFlow<AppSettings>), SecureKeys (encrypted USDA key)
@@ -85,6 +85,14 @@ new tables, copied from Room's exported `2.json`. It never drops or alters the f
 there is no destructive fallback. `MigrationTest` (JVM, real SQLite via sqlite-jdbc) builds a v1 database from
 `1.json`, adds rows, runs the migration, and checks the data survived and that every table's columns, indices and
 foreign keys match `2.json` (what Room validates after a migration), plus the cascade / `SET NULL` behaviour.
+
+### Migration 2 → 3 (bodyweight sets)
+
+`Migrations.SQL_2_3` adds `workout_exercises.isBodyweight INTEGER NOT NULL DEFAULT 0`, then `BODYWEIGHT_FIXUP` flags
+rows whose exercise is bodyweight-loaded (`BODYWEIGHT` equipment and not cardio, or `assisted-pull-up`) and sets their
+`weightKg = 0` sets to `NULL` (= plain BW). On bodyweight sets `weightKg` is the added load (negative = assistance).
+The same fixup runs when importing a backup older than version 3. `MigrationTest` checks 1 → 2 → 3 against `3.json`
+and the 2 → 3 data fixup.
 
 ## Training flows
 

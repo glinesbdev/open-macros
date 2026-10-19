@@ -1,0 +1,41 @@
+# Copy of .github/workflows/android.yml with stable debug signing.
+# The bot's GitHub token can't edit workflow files, so paste this file's contents over
+# .github/workflows/android.yml (everything from "name:" down).
+name: Android CI
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      # Secrets aren't available to pull requests from forks; then this step is a no-op and Gradle
+      # falls back to the default debug key, so the build still passes.
+      - name: Set up stable debug signing
+        env:
+          SIGNING_KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_B64" ]; then
+            echo "No signing secrets available: using the default debug key."
+            exit 0
+          fi
+          printf '%s' "$SIGNING_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/debug-signing.jks"
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/debug-signing.jks" >> "$GITHUB_ENV"
+      - run: ./gradlew assembleDebug testDebugUnitTest --stacktrace
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/debug-signing.jks"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
