@@ -262,12 +262,18 @@ private fun ExerciseCard(
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             suggestion?.let { s ->
-                Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
+                Surface(color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(s.message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                        if (s.weightKg != null || s.targetReps > 0) TextButton(onClick = {
-                            scope.launch { c.training.applySuggestion(we, s); version++ }
-                        }) { Text("Apply") }
+                        if (s.weightKg != null || s.targetReps > 0) Button(
+                            onClick = { scope.launch { c.training.applySuggestion(we, s); version++ } },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            ),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(start = 8.dp).heightIn(min = 32.dp),
+                        ) { Text("Apply", style = MaterialTheme.typography.labelLarge) }
                     }
                 }
             }
